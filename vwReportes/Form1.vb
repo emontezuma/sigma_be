@@ -40,20 +40,51 @@ Public Class Form1
     Dim bajo_hasta As Integer
     Dim medio_hasta As Integer
 
+    Dim id01 As Boolean = False
+    Dim id02 As Boolean = False
+    Dim id03 As Boolean = False
+    Dim id04 As Boolean = False
+    Dim id05 As Boolean = False
+    Dim id06 As Boolean = False
+    Dim id07 As Boolean = False
+    Dim id08 As Boolean = False
+    Dim id09 As Boolean = False
+    Dim id10 As Boolean = False
+    Dim id11 As Boolean = False
+    Dim id12 As Boolean = False
+    Dim id13 As Boolean = False
+    Public be_log_activar As Boolean = False
+
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        estadoPrograma = True
-        enviarReportes()
-        Me.Close()
+        Dim argumentos As String() = Environment.GetCommandLineArgs()
+        If Process.GetProcessesByName _
+          (Process.GetCurrentProcess.ProcessName).Length > 1 Then
+        ElseIf argumentos.Length <= 1 Then
+            MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+        Else
+            cadenaConexion = argumentos(1)
+            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+            Dim idProceso = Process.GetCurrentProcess.Id
+
+            idProceso = Process.GetCurrentProcess.Id
+
+
+
+            estadoPrograma = True
+            enviarReportes()
+
+        End If
+        Application.Exit()
     End Sub
 
     Private Sub enviarReportes()
         'Se envía correo
 
-        Dim cadSQL As String = "SELECT * FROM sigma.vw_control WHERE fecha = '" & Format(Now, "yyyyMMddHH") & "'"
+        Dim cadSQL As String = "SELECT * FROM " & rutaBD & ".control WHERE fecha = '" & Format(Now, "yyyyMMddHH") & "'"
         Dim readerDS As DataSet = consultaSEL(cadSQL)
         If readerDS.Tables(0).Rows.Count > 0 Then
-            Exit Sub
+            'Exit Sub
         End If
 
 
@@ -66,8 +97,9 @@ Public Class Form1
         Dim correo_clave As String
         Dim correo_host As String
         Dim rutaFiles As String
+        Dim be_envio_reportes As Boolean = False
 
-        cadSQL = "SELECT * FROM sigma.configuracion"
+        cadSQL = "SELECT * FROM " & rutaBD & ".configuracion"
         readerDS = consultaSEL(cadSQL)
         If readerDS.Tables(0).Rows.Count > 0 Then
             Dim reader As DataRow = readerDS.Tables(0).Rows(0)
@@ -75,6 +107,7 @@ Public Class Form1
             correo_clave = ValNull(reader!correo_clave, "A")
             correo_puerto = ValNull(reader!correo_puerto, "A")
             correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
+            be_envio_reportes = ValNull(reader!be_envio_reportes, "A") = "S"
             correo_host = ValNull(reader!correo_host, "A")
             rutaFiles = ValNull(reader!ruta_archivos_enviar, "A")
             alto_etiqueta = ValNull(reader!alto_etiqueta, "A")
@@ -88,121 +121,166 @@ Public Class Form1
             noatendio_color = ValNull(reader!noatendio_color, "A")
             bajo_hasta = ValNull(reader!bajo_hasta, "N")
             medio_hasta = ValNull(reader!medio_hasta, "N")
+            be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
+
         End If
-        If bajo_hasta = 0 Then bajo_hasta = 50
-        If medio_hasta = 0 Then medio_hasta = 75
-        If alto_etiqueta.Length = 0 Then alto_etiqueta = "Buenas"
-        If escaladas_etiqueta.Length = 0 Then escaladas_etiqueta = "Escaladas"
-        If noatendio_etiqueta.Length = 0 Then noatendio_etiqueta = "No atendidas"
-        alto_color = Microsoft.VisualBasic.Strings.Replace(alto_color, "HEX", "#")
-        escaladas_color = Microsoft.VisualBasic.Strings.Replace(escaladas_color, "HEX", "#")
-        noatendio_color = Microsoft.VisualBasic.Strings.Replace(noatendio_color, "HEX", "#")
-        If alto_color.Length = 0 Then alto_color = System.Drawing.Color.LimeGreen.ToString
-        If escaladas_color.Length = 0 Then escaladas_color = System.Drawing.Color.OrangeRed.ToString
-        If noatendio_color.Length = 0 Then noatendio_color = System.Drawing.Color.Tomato.ToString
+        If be_envio_reportes Then
+            If bajo_hasta = 0 Then bajo_hasta = 50
+            If medio_hasta = 0 Then medio_hasta = 75
+            If alto_etiqueta.Length = 0 Then alto_etiqueta = "Buenas"
+            If escaladas_etiqueta.Length = 0 Then escaladas_etiqueta = "Escaladas"
+            If noatendio_etiqueta.Length = 0 Then noatendio_etiqueta = "No atendidas"
+            alto_color = "#" & alto_color
+            escaladas_color = "#" & escaladas_color
+            noatendio_color = "#" & noatendio_color
+            If alto_color.Length = 0 Then alto_color = System.Drawing.Color.LimeGreen.ToString
+            If escaladas_color.Length = 0 Then escaladas_color = System.Drawing.Color.OrangeRed.ToString
+            If noatendio_color.Length = 0 Then noatendio_color = System.Drawing.Color.Tomato.ToString
 
-
-        If rutaFiles.Length = 0 Then
-            rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
-        Else
-            If Not My.Computer.FileSystem.DirectoryExists(rutaFiles) Then
-                Try
-                    My.Computer.FileSystem.CreateDirectory(rutaFiles)
-                Catch ex As Exception
-                    rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
-                End Try
+            If rutaFiles.Length = 0 Then
+                rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+            Else
+                rutaFiles = Strings.Replace(rutaFiles, "/", "\")
+                If Not My.Computer.FileSystem.DirectoryExists(rutaFiles) Then
+                    Try
+                        My.Computer.FileSystem.CreateDirectory(rutaFiles)
+                    Catch ex As Exception
+                        rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                    End Try
+                End If
             End If
-        End If
+            If rutaFiles <> My.Computer.FileSystem.SpecialDirectories.MyDocuments Then
+                For Each foundFile As String In My.Computer.FileSystem.GetFiles(
+  rutaFiles, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.png")
+                    Try
+                        File.Delete(foundFile)
+                    Catch ex2 As Exception
 
-        If Not estadoPrograma Then
-            Exit Sub
-        End If
-        cadSQL = "Select * FROM sigma.cat_correos WHERE estatus = 'A'"
-        'Se preselecciona la voz
-        Dim indice = 0
+                    End Try
 
-        Dim mensajesDS As DataSet = consultaSEL(cadSQL)
-        Dim mensajeGenerado = False
-        Dim tMensajes = 0
+                    'Se mueven los archivos a otra carpeta
+                Next
 
-        If mensajesDS.Tables(0).Rows.Count > 0 Then
+                For Each foundFile As String In My.Computer.FileSystem.GetFiles(
+  rutaFiles, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.csv")
+                    Try
+                        File.Delete(foundFile)
+                    Catch ex2 As Exception
 
-            Dim enlazado = False
-            Dim errorCorreo = ""
-            Dim smtpServer As New SmtpClient()
+                    End Try
 
-            Try
-                smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
-                smtpServer.Port = correo_puerto
-                smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
-                smtpServer.EnableSsl = correo_ssl
-                enlazado = True
-            Catch ex As Exception
-                errorCorreo = ex.Message
-            End Try
-            If enlazado Then
+                    'Se mueven los archivos a otra carpeta
+                Next
 
-                For Each elmensaje In mensajesDS.Tables(0).Rows
-                    'Se busca si hay uno del día y hra
-                    Dim periodicidad As String = ValNull(elmensaje!frecuencia, "A")
-                    If periodicidad.Length > 0 Then
-                        Dim envio As String() = periodicidad.Split(New Char() {";"c})
-                        If envio(0).Length > 0 And envio(1).Length > 0 Then
+            End If
+            If Not estadoPrograma Then
+                Exit Sub
+            End If
+            cadSQL = "Select * FROM " & rutaBD & ".cat_correos WHERE estatus = 'A'"
+            'Se preselecciona la voz
+            Dim indice = 0
+
+            Dim mensajesDS As DataSet = consultaSEL(cadSQL)
+            Dim mensajeGenerado = False
+            Dim tMensajes = 0
+
+            If mensajesDS.Tables(0).Rows.Count > 0 Then
+
+                Dim enlazado = False
+                Dim errorCorreo = ""
+                Dim smtpServer As New SmtpClient()
+
+                Try
+                    smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                    smtpServer.Port = correo_puerto
+                    smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
+                    smtpServer.EnableSsl = correo_ssl
+                    enlazado = True
+                Catch ex As Exception
+                    errorCorreo = ex.Message
+                End Try
+                If enlazado Then
+
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        id01 = False
+                        id02 = False
+                        id03 = False
+                        id04 = False
+                        id05 = False
+                        id06 = False
+                        id07 = False
+                        id08 = False
+                        id09 = False
+                        id10 = False
+                        id11 = False
+                        id12 = False
+                        id13 = False
+                        Dim envio = elmensaje!extraccion.Split(New Char() {";"c})
+                        'Se busca si hay uno del día y hra
+                        If envio(2).Length > 0 And envio(3).Length > 0 Then
                             Dim enviarDia As Boolean = False
                             Dim diaSemana = DateAndTime.Weekday(Now)
                             Dim cadFrecuencia As String = "Este reporte se le envía Todos los días"
-                            If envio(0) = "T" Then
+                            If envio(2) = "T" Then
                                 enviarDia = True
-                            ElseIf envio(0) = "LV" And diaSemana >= 2 And diaSemana <= 6 Then
+                            ElseIf envio(2) = "LV" And diaSemana >= 2 And diaSemana <= 6 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía de lunes a viernes"
-                            ElseIf envio(0) = "L" And diaSemana = 2 Then
+                            ElseIf envio(2) = "L" And diaSemana = 2 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los lunes"
-                            ElseIf envio(0) = "M" And diaSemana = 3 Then
+                            ElseIf envio(2) = "M" And diaSemana = 3 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los martes"
-                            ElseIf envio(0) = "MI" And diaSemana = 4 Then
+                            ElseIf envio(2) = "MI" And diaSemana = 4 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los miércoles"
-                            ElseIf envio(0) = "J" And diaSemana = 5 Then
+                            ElseIf envio(2) = "J" And diaSemana = 5 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los jueves"
-                            ElseIf envio(0) = "V" And diaSemana = 6 Then
+                            ElseIf envio(2) = "V" And diaSemana = 6 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los viernes"
-                            ElseIf envio(0) = "S" And diaSemana = 7 Then
+                            ElseIf envio(2) = "S" And diaSemana = 7 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los sábados"
-                            ElseIf envio(0) = "D" And diaSemana = 1 Then
+                            ElseIf envio(2) = "D" And diaSemana = 1 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía los domingos"
-                            ElseIf envio(0) = "1M" And Val(Today.Day) = 1 Then
+                            ElseIf envio(2) = "1M" And Val(Today.Day) = 1 Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía el primer día del mes"
-                            ElseIf envio(0) = "UM" And Val(Today.Day) = Date.DaysInMonth(Today.Year, Today.Month) Then
+                            ElseIf envio(2) = "UM" And Val(Today.Day) = Date.DaysInMonth(Today.Year, Today.Month) Then
                                 enviarDia = True
                                 cadFrecuencia = "Este reporte se le envía el último día del mes"
                             End If
+
+                            'eemv
+                            'enviarDia = True
+
+
                             If enviarDia Then
                                 Dim enviar As Boolean = False
                                 Dim hora = Val(Format(Now, "HH"))
-                                If envio(1) = "T" Then
+                                If envio(3) = "T" Then
                                     enviar = True
                                     cadFrecuencia = cadFrecuencia & " a cada hora"
-                                ElseIf Val(envio(1)) = Val(hora) Then
+                                ElseIf Val(envio(3)) = Val(hora) Then
                                     cadFrecuencia = cadFrecuencia & IIf(Val(hora) = 1, " a la 1:00am", "a las " & Val(hora) & " horas")
                                     enviar = True
                                 End If
+
+
+                                'eemv
+                                'enviar = True
+
+
                                 If enviar Then
-                                    Dim reportes As String() = elmensaje!reportes.Split(New Char() {";"c})
-                                    Dim periodos As String() = elmensaje!periodos.Split(New Char() {";"c})
-                                    Dim nperiodos As String() = elmensaje!nperiodos.Split(New Char() {";"c})
                                     Dim mail As New MailMessage
                                     Try
                                         Dim cuerpo As String = ValNull(elmensaje!cuerpo, "A")
                                         Dim titulo As String = ValNull(elmensaje!titulo, "A")
-                                        If titulo.Length = 0 Then titulo = "Reportes automáticos, aplicación de monitor de fallas"
+                                        If titulo.Length = 0 Then titulo = "ANDON Reportes automáticos"
                                         If cuerpo.Length = 0 Then cuerpo = "Se le ha enviado este correo. No responda ya que esta cuenta no es monitoreada"
 
                                         mail.From = New MailAddress(correo_cuenta) 'TextBox1.Text & "@gmail.com")
@@ -210,6 +288,8 @@ Public Class Form1
                                         Dim mailsV As String() = mails.Split(New Char() {";"c})
                                         For Each cuenta In mailsV
                                             If cuenta.Length > 0 Then
+                                                cuenta = Strings.Replace(cuenta, vbCrLf, "")
+                                                cuenta = Strings.Replace(cuenta, vbLf, "")
                                                 mail.To.Add(cuenta)
                                             End If
                                         Next
@@ -217,6 +297,8 @@ Public Class Form1
                                         mailsV = mails.Split(New Char() {";"c})
                                         For Each cuenta In mailsV
                                             If cuenta.Length > 0 Then
+                                                cuenta = Strings.Replace(cuenta, vbCrLf, "")
+                                                cuenta = Strings.Replace(cuenta, vbLf, "")
                                                 mail.CC.Add(cuenta)
                                             End If
                                         Next
@@ -224,124 +306,39 @@ Public Class Form1
                                         mailsV = mails.Split(New Char() {";"c})
                                         For Each cuenta In mailsV
                                             If cuenta.Length > 0 Then
+                                                cuenta = Strings.Replace(cuenta, vbCrLf, "")
+                                                cuenta = Strings.Replace(cuenta, vbLf, "")
                                                 mail.Bcc.Add(cuenta)
                                             End If
                                         Next
                                         mail.Subject = titulo
                                         errorCorreos = ""
                                         cuerpo = cuerpo & vbCrLf & "Reportes a enviar: "
-                                        If reportes(0) <> "N" Then
 
-                                            Dim miReporte = generarReporte1(reportes(0), periodos(0), nperiodos(0), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas por estación (frecuencia): SIN DATOS (por error) " & errorCorreos
-                                            Else
+                                        cadSQL = "SELECT a.reporte, b.nombre, b.grafica, b.file_name, b.grafica FROM " & rutaBD & ".det_correo a INNER JOIN " & rutaBD & ".int_listados b ON a.reporte = b.id WHERE a.correo = " & elmensaje!id & " ORDER BY b.orden"
+                                        mensajesDS = consultaSEL(cadSQL)
+                                        If mensajesDS.Tables(0).Rows.Count > 0 Then
 
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_estacion.csv") Then
-                                                    cuerpo = cuerpo & vbCrLf & "Reporte de fallas por estación (frecuencia)"
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_estacion.csv")
-                                                    mail.Attachments.Add(archivo)
+                                            For Each reporte In mensajesDS.Tables(0).Rows
+                                                Dim miReporte = generarReporte(reporte!reporte, reporte!nombre, reporte!file_name, envio(0), envio(1), rutaFiles, reporte!grafica)
+                                                If miReporte = -1 Then
+                                                    cuerpo = cuerpo & vbCrLf & reporte!nombre & " NO SE GENERÓ (por error) " & errorCorreos
                                                 Else
-                                                    cuerpo = cuerpo & vbCrLf & "Reporte de fallas por estación (frecuencia): SIN DATOS"
-                                                End If
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_estacion.png") Then
 
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_estacion.png")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
+                                                    If My.Computer.FileSystem.FileExists(rutaFiles & "\" & reporte!file_name & ".csv") Then
+                                                        cuerpo = cuerpo & vbCrLf & reporte!nombre
+                                                        Dim archivo As Attachment = New Attachment(rutaFiles & "\" & reporte!file_name & ".csv")
+                                                        mail.Attachments.Add(archivo)
+                                                    Else
+                                                        cuerpo = cuerpo & vbCrLf & reporte!nombre & " NO SE GENERÓ (por datos) "
+                                                    End If
+                                                    If My.Computer.FileSystem.FileExists(rutaFiles & "\" & reporte!file_name & ".png") Then
 
-                                        errorCorreos = ""
-                                        If reportes(1) <> "N" Then
-
-                                            Dim miReporte = generarReporte2(reportes(1), periodos(1), nperiodos(1), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas por estación (frecuencia y tiempo): SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas por estación (frecuencia y tiempo)"
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_estacion_tiempo.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_estacion_tiempo.csv")
-                                                    mail.Attachments.Add(archivo)
+                                                        Dim archivo As Attachment = New Attachment(rutaFiles & "\" & reporte!file_name & ".png")
+                                                        mail.Attachments.Add(archivo)
+                                                    End If
                                                 End If
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_estacion_tiempo.png") Then
-
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_estacion_tiempo.png")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
-                                        errorCorreos = ""
-                                        If reportes(2) <> "N" Then
-                                            Dim miReporte = generarReporte3(reportes(2), periodos(2), nperiodos(2), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas por tecnología (frecuencia y tiempo): SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas por tecnología (frecuencia y tiempo)"
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_tecnologia_tiempo.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_tecnologia_tiempo.csv")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_por_tecnologia_tiempo.png") Then
-
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_por_tecnologia_tiempo.png")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
-                                        If reportes(3) <> "N" Then
-                                            Dim miReporte = generarReporte4(reportes(3), periodos(3), nperiodos(3), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de 10 fallas más altas (ordenado por frecuencia): SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de 10 fallas más altas (ordenado por frecuencia)"
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\top_10_fallas.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\top_10_fallas.csv")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
-                                        If reportes(4) <> "N" Then
-                                            Dim miReporte = generarReporte5(reportes(4), periodos(4), nperiodos(4), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de rendimiento por staff: SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de rendimiento por staff"
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\rendimiento_staff.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\rendimiento_staff.csv")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\rendimiento_staff.png") Then
-
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\rendimiento_staff.png")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
-                                        If reportes(5) <> "N" Then
-                                            Dim miReporte = generarReporte6(reportes(5), periodos(5), nperiodos(5), rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de estadistica de fallas: SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de estadistica de fallas."
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\estadistica_de_fallas.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\estadistica_de_fallas.csv")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
-                                        End If
-
-                                        If reportes(6) <> "N" Then
-                                            Dim miReporte = generarReporte7(rutaFiles)
-                                            If miReporte = -1 Then
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas abiertas al momento: SIN DATOS (por error) " & errorCorreos
-                                            Else
-                                                cuerpo = cuerpo & vbCrLf & "Reporte de fallas abiertas al momento"
-                                                If My.Computer.FileSystem.FileExists(rutaFiles & "\fallas_abiertas.csv") Then
-                                                    Dim archivo As Attachment = New Attachment(rutaFiles & "\fallas_abiertas.csv")
-                                                    mail.Attachments.Add(archivo)
-                                                End If
-                                            End If
+                                            Next
                                         End If
                                         cuerpo = cadFrecuencia & vbCrLf & vbCrLf & cuerpo
                                         mail.Body = cuerpo
@@ -356,315 +353,46 @@ Public Class Form1
                                 End If
                             End If
                         End If
-                    End If
-                Next
-            End If
-            If enlazado Then
-                If tMensajes > 0 Then
-                    agregarLOG("Se enviaron " & tMensajes & " reporte(s) vía correo electrónico  ", 1, 0)
-                Else
-                    agregarLOG("No se enviaron reportes vía correo electrónico", 1, 0)
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".cat_correos SET ultimo_envio = '" & Format(Now, "yyyy/MM/dd HH:mm:ss") & "' WHERE id = " & elmensaje!id)
+                    Next
                 End If
+                If enlazado Then
+                    If tMensajes > 0 Then
+                        agregarLOG("Se enviaron " & tMensajes & " reporte(s) vía correo electrónico ")
+                    Else
+                        agregarLOG("No se enviaron reportes vía correo electrónico")
+                    End If
 
-            Else
-                agregarLOG("Hubo un error en la conexión al servidor de correos. El error es: " & errorCorreo, 7, 0)
+                Else
+                    agregarLOG("Hubo un error en la conexión al servidor de correos. El error es: " & errorCorreo, 0, 9)
+                End If
+                smtpServer.Dispose()
             End If
-            smtpServer.Dispose()
+            regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".control (fecha, mensajes) VALUES ('" & Format(Now, "yyyyMMddHH") & "', " & tMensajes & ")")
         End If
-        regsAfectados = consultaACT("INSERT INTO sigma.vw_control (fecha, mensajes) VALUES ('" & Format(Now, "yyyyMMddHH") & "', " & tMensajes & ")")
     End Sub
 
-    Function generarReporte1(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-        generarReporte1 = 0
+    Function generarReporte(idReporte As Integer, reporte As String, fName As String, periodo As String, nperiodos As Integer, ruta As String, graficar As String) As Integer
+        generarReporte = 0
+
+        Dim archivoSaliente = ruta & "\" & fName & ".csv"
+        Dim archivoImagen = ruta & "\" & fName & ".png"
+
         Try
-            My.Computer.FileSystem.DeleteFile(ruta & "\fallas_por_estacion.csv")
-            My.Computer.FileSystem.DeleteFile(ruta & "\fallas_por_estacion.png")
+            My.Computer.FileSystem.DeleteFile(archivoSaliente)
 
 
         Catch ex As Exception
 
         End Try
 
-        Dim eDesde = Now()
-        Dim eHasta = Now()
-        Dim ePeriodo = nperiodos
-        Dim diaSemana = DateAndTime.
-            Day(Now)
-        Dim intervalo = DateInterval.Second
-        Dim cadPeriodo As String = nperiodos & " segundo(s) atras"
-        If periodo = 1 Then
-            intervalo = DateInterval.Minute
-            cadPeriodo = nperiodos & " minuto(s) atras"
-        ElseIf periodo = 2 Then
-            intervalo = DateInterval.Hour
-            cadPeriodo = nperiodos & " hora(s) atras"
-        ElseIf periodo = 3 Then
-            intervalo = DateInterval.Day
-            cadPeriodo = nperiodos & " día(s) atras"
-        ElseIf periodo = 4 Then
-            intervalo = DateInterval.Day
-            ePeriodo = 6
-            cadPeriodo = nperiodos & " semana(s) atras"
-        ElseIf periodo = 5 Then
-            intervalo = DateInterval.Month
-            cadPeriodo = nperiodos & " mes(es) atras"
-        ElseIf periodo = 6 Then
-            intervalo = DateInterval.Year
-            cadPeriodo = nperiodos & " año(s) atras"
-        ElseIf periodo = 10 Then
-            eDesde = CDate(Format(Now, "yyyy/MM/dd") & " 00:00:00")
-            cadPeriodo = "Lo que va del día de hoy"
-        ElseIf periodo = 11 Then
-            cadPeriodo = "Lo que va de la semana"
-            If diaSemana = 0 Then
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, -6, Now), "yyyy/MM/dd") & " 00:00:00")
-            Else
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, (diaSemana - 2) * -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            End If
-        ElseIf periodo = 12 Then
-            cadPeriodo = "Lo que va del mes"
-            eDesde = CDate(Format(Now, "yyyy/MM") & "/01 00:00:00")
-        ElseIf periodo = 13 Then
-            cadPeriodo = "Lo que va del anyo"
-            eDesde = CDate(Format(Now, "yyyy") & "/01/01 00:00:00")
-        ElseIf periodo = 20 Then
-            cadPeriodo = "El día de ayer"
-            eDesde = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 23:59:59")
-        ElseIf periodo = 21 Then
-            cadPeriodo = "La semana pasada"
-            Dim dayDiff As Integer = Date.Today.DayOfWeek - DayOfWeek.Monday
-            eDesde = CDate(Format(Today.AddDays(-dayDiff), "yyyy/MM/dd") & " 00:00:00")
-            eDesde = DateAdd(DateInterval.Day, -7, CDate(eDesde))
-            eHasta = DateAdd(DateInterval.Day, 6, CDate(eDesde))
-        ElseIf periodo = 22 Then
-            cadPeriodo = "El mes pasado"
-            eDesde = CDate(Format(DateAdd(DateInterval.Month, -1, Now), "yyyy/MM") & "/01 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, CDate(Format(Now, "yyyy/MM") & "/01")), "yyyy/MM/dd") & " 23:59:59")
-        End If
-        If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
-        Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
-        Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
-        Dim cadSQL As String = "SELECT vw_alarmas.estacion AS estacion, SUM(IF(vw_alarmas.reporte > 0, 1, 0)) AS total, SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) AS buenas, SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0)) AS tarde, SUM(IF(vw_alarmas.tiempo = 0, 1, 0)) AS noatendio FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' GROUP BY vw_alarmas.estacion ORDER BY 2 DESC"
-        Dim reader As DataSet = consultaSEL(cadSQL)
-        Dim regsAfectados = 0
-        If errorBD.Length > 0 Then
-            agregarLOG("Ocurrió un error al intentar leer MySQL. Error: " + Microsoft.VisualBasic.Strings.Left(errorBD, 250), 9, 0)
-            errorCorreos = errorBD
-            generarReporte1 = -1
-        Else
-            If reader.Tables(0).Rows.Count > 0 Then
-                Dim cadExportar As String = ""
-
-                'Creación de la gráfica
-
-                '
-                If reporte = "T" Or reporte = "D" Then
-                    cadExportar = "Reporte de fallas por estacion (frecuencia)" & vbCrLf
-                    cadExportar = cadExportar & "Extraccion de datos: " & cadPeriodo & vbCrLf
-                    cadExportar = cadExportar & "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss") & vbCrLf
-                    cadExportar = cadExportar & "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " & Format(eHasta, "dd-MM-yyyy HH:mm:ss") & vbCrLf & vbCrLf
-
-                    cadExportar = cadExportar & "Atencion"
-                    For Each lineas In reader.Tables(0).Rows
-                        Dim miEstacion As String = ValNull(lineas!estacion, "A")
-                        cadExportar = cadExportar & "," & IIf(miEstacion.Length > 0, miEstacion, "N/A")
-                    Next
-                    cadExportar = cadExportar & vbCrLf
-                    cadExportar = cadExportar & "Total"
-
-                    For Each lineas In reader.Tables(0).Rows
-                        cadExportar = cadExportar & "," & lineas!total
-                    Next
-                    cadExportar = cadExportar & vbCrLf
-                    cadExportar = cadExportar & alto_etiqueta
-                    For Each lineas In reader.Tables(0).Rows
-                        cadExportar = cadExportar & "," & lineas!buenas
-                    Next
-                    cadExportar = cadExportar & vbCrLf
-                    cadExportar = cadExportar & escaladas_etiqueta
-                    For Each lineas In reader.Tables(0).Rows
-                        cadExportar = cadExportar & "," & lineas!tarde
-                    Next
-                    cadExportar = cadExportar & vbCrLf
-                    cadExportar = cadExportar & noatendio_etiqueta
-                    For Each lineas In reader.Tables(0).Rows
-                        cadExportar = cadExportar & "," & lineas!noatendio
-                    Next
-                    cadExportar = cadExportar & vbCrLf & vbCrLf
-                    cadExportar = cadExportar & "Total estacion(es): " & reader.Tables(0).Rows.Count
-
-                    Try
-                        System.IO.File.Create(ruta & "\fallas_por_estacion.csv").Dispose()
-                        Dim objWriter As New System.IO.StreamWriter(ruta & "\fallas_por_estacion.csv", True)
-                        objWriter.WriteLine(cadExportar)
-                        objWriter.Close()
-                        generarReporte1 = reader.Tables(0).Rows.Count
-                    Catch ex As Exception
-                        errorCorreos = ex.Message
-                        generarReporte1 = -1
-                        agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte. Error: " + ex.Message, 7, 0)
-                    End Try
-                End If
-                If reporte = "T" Or reporte = "G" Then
-                    'Se produce el gráfico
-                    Dim Titulo As New ChartTitle()
-
-                    Titulo.Text = "    Gráfica de Fallas por estación    "
-                    Dim miFuente = New Drawing.Font("Lucida Sans", 10, FontStyle.Regular)
-                    Dim miFuenteAlto = New Drawing.Font("Lucida Sans", 16, FontStyle.Bold)
-                    Dim miFuenteEjes = New Drawing.Font("Lucida Sans", 11, FontStyle.Regular)
-
-                    Titulo.Font = miFuenteAlto
-
-
-                    ' Create an empty table.
-                    Dim datos As New DataTable("grafico")
-
-                    ' Add two columns to the table.
-                    datos.Columns.Add("estacion", GetType(String))
-                    datos.Columns.Add("total", GetType(Int32))
-                    datos.Columns.Add("buenas", GetType(Int32))
-                    datos.Columns.Add("tarde", GetType(Int32))
-                    datos.Columns.Add("noatendio", GetType(Int32))
-
-                    ' Add data rows to the table.
-                    Dim row As DataRow = Nothing
-                    For Each lineas In reader.Tables(0).Rows
-                        row = datos.NewRow()
-                        row("estacion") = lineas!estacion
-                        row("total") = lineas!total
-                        row("buenas") = lineas!buenas
-                        row("tarde") = lineas!tarde
-                        row("noatendio") = lineas!noatendio
-                        datos.Rows.Add(row)
-                    Next
-                    Dim series As New Series("Todas las llamadas", ViewType.Bar)
-
-
-                    ChartControl1.Series.Add(series)
-                    series.DataSource = datos
-                    series.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series.View.Color = Color.Gray
-                    series.ArgumentScaleType = ScaleType.Qualitative
-                    series.ArgumentDataMember = "estacion"
-                    series.ValueScaleType = ScaleType.Numerical
-                    series.ValueDataMembers.AddRange(New String() {"total"})
-                    series.Label.BackColor = Color.LightGray
-                    series.Label.TextColor = Color.Black
-                    series.Label.Font = miFuente
-
-                    series = New Series(alto_etiqueta, ViewType.Bar)
-                    ChartControl1.Series.Add(series)
-                    series.DataSource = datos
-                    series.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series.View.Color = ColorTranslator.FromHtml(alto_color)
-                    series.ArgumentScaleType = ScaleType.Qualitative
-                    series.ArgumentDataMember = "estacion"
-                    series.ValueScaleType = ScaleType.Numerical
-                    series.ValueDataMembers.AddRange(New String() {"buenas"})
-                    series.Label.BackColor = Color.LightGray
-                    series.Label.TextColor = Color.Black
-                    series.Label.Font = miFuente
-
-
-                    series = New Series(escaladas_etiqueta, ViewType.Bar)
-                    ChartControl1.Series.Add(series)
-                    series.DataSource = datos
-                    series.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series.View.Color = ColorTranslator.FromHtml(escaladas_color)
-                    series.ArgumentScaleType = ScaleType.Qualitative
-                    series.ArgumentDataMember = "estacion"
-                    series.ValueScaleType = ScaleType.Numerical
-                    series.ValueDataMembers.AddRange(New String() {"tarde"})
-                    series.Label.BackColor = Color.LightGray
-                    series.Label.TextColor = Color.Black
-                    series.Label.Font = miFuente
-
-
-                    series = New Series(noatendio_etiqueta, ViewType.Bar)
-                    ChartControl1.Series.Add(series)
-                    series.DataSource = datos
-                    series.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series.View.Color = ColorTranslator.FromHtml(noatendio_color)
-                    series.ArgumentScaleType = ScaleType.Qualitative
-                    series.ArgumentDataMember = "estacion"
-                    series.ValueScaleType = ScaleType.Numerical
-                    series.ValueDataMembers.AddRange(New String() {"noatendio"})
-                    series.Label.BackColor = Color.LightGray
-                    series.Label.TextColor = Color.Black
-                    series.Label.Font = miFuente
-
-                    ' Set some properties to get a nice-looking chart.
-                    CType(series.View, SideBySideBarSeriesView).ColorEach = False
-                    CType(series.Label, SideBySideBarSeriesLabel).ResolveOverlappingMode = ResolveOverlappingMode.HideOverlapped
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Visibility = DevExpress.Utils.DefaultBoolean.True
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Text = "Número de llamadas en el período"
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Text = "    Estaciones con llamada    "
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-
-                    ChartControl1.Titles.Add(Titulo)
-                    Dim Titulo2 As New ChartTitle()
-
-                    Titulo2.Font = miFuente
-                    Titulo2.Text = "Extraccion de datos: " & cadPeriodo
-                    ChartControl1.Titles.Add(Titulo2)
-                    Dim Titulo3 As New ChartTitle()
-                    Titulo3.Font = miFuente
-                    Titulo3.Text = "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo3)
-                    Dim Titulo4 As New ChartTitle()
-                    Titulo4.Font = miFuente
-                    Titulo4.Text = "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " &
-                        Format(eHasta, "dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo4)
-                    ChartControl1.Width = 1000
-                    ChartControl1.Height = 700
-                    Try
-                        Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(ruta & "\fallas_por_estacion.png", "\", "\\")
-                        SaveChartImageToFile(ChartControl1, ImageFormat.Png, rutaImagen)
-                        Dim image As Image = GetChartImage(ChartControl1, ImageFormat.Png)
-                        image.Save(rutaImagen)
-
-                    Catch ex As Exception
-                        agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " + ex.Message, 7, 0)
-                    End Try
-
-
-                    'No hay datos, notificar
-                End If
-            End If
-        End If
-    End Function
-
-    Function generarReporte2(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-
-
-        generarReporte2 = 0
-
-        Dim archivoSaliente = ruta & "\fallas_por_estacion_tiempo.csv"
-        Dim archivoImagen = ruta & "\fallas_por_estacion_tiempo.png"
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte2 = -1
-                Exit Function
-            End Try
-        End If
         Try
             My.Computer.FileSystem.DeleteFile(archivoImagen)
+
+
         Catch ex As Exception
 
         End Try
-
 
         archivoSaliente = archivoSaliente.Replace("\", "\\")
 
@@ -727,812 +455,732 @@ Public Class Form1
         If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
         Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
         Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
+        Dim fDesdeSF = Format(eDesde, "yyyy/MM/dd")
+        Dim fHastaSF = Format(eHasta, "yyyy/MM/dd")
+
+        Dim filtroParos = " AND f.fecha >= '" & fDesdeSF & "' AND f.fecha <= '" & fHastaSF & "' "
+        Dim filtroFechas = " fecha >= '" & fDesdeSF & "' AND fecha <= '" & fHastaSF & "' "
+        Dim filtroReportes = " AND c.fecha_reporte >= '" & fDesdeSF & "' AND c.fecha_reporte <= '" & fHastaSF & "' "
+        Dim filtroFechasDia = " a.fecha >= '" & fDesdeSF & "' AND a.fecha <= '" & fHastaSF & "' "
 
         Dim comillas = Microsoft.VisualBasic.Strings.Left(Chr(34), 1)
-        If reporte = "T" Or reporte = "D" Then
 
-            Dim regsAfectados = consultaACT("USE sigma;
-        SELECT * FROM 
-        (SELECT 'Reporte de fallas atendidas por estacion - Frecuencia y tiempo (" & cadPeriodo & ")','' as b,'' as c,'' as d 
-        UNION 
-        (SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','') 
-        UNION 
-        (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'),'','','') 
-        UNION 
-        (SELECT 'Estacion','Frecuencia','Tiempo total (min)','Tiempo total (seg)') 
-        UNION
-        (SELECT IFNULL(vw_alarmas.estacion, 'N/A'), COUNT(*), ROUND(SUM(vw_alarmas.tiempo / 60), 0), SUM(vw_alarmas.tiempo) FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0 GROUP BY vw_alarmas.estacion ORDER BY 2 DESC) 
-        UNION 
-        (SELECT 'TOTAL reporte: ', COUNT(*), ROUND(SUM(vw_alarmas.tiempo / 60), 0), SUM(vw_alarmas.tiempo) FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0)) as query01  
-        INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
-            If errorBD.Length > 0 Then
-                errorCorreos = errorBD
-                agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-                generarReporte2 = -1
+        Dim inicial = ""
+        Dim cabecera = ""
+        Dim registros = ""
+        Dim cadTitulo = "Nombre de la linea"
+        Dim cadTabla = "" & rutaBD & ".cat_lineas"
+        Dim cadJoin = "c.linea"
+        Dim cadCampo = ""
+        Dim numTabla = ""
+        Dim grupoFecha = ""
+        Dim cadGrafico = ""
+        Dim grupoFechaG = ""
+        If idReporte = 2 Or idReporte = 15 Or idReporte = 28 Then
+            cadTitulo = "Nombre de la maquina"
+            cadTabla = "" & rutaBD & ".cat_maquinas"
+            cadJoin = "c.maquina"
+        ElseIf idReporte = 3 Or idReporte = 16 Or idReporte = 29 Then
+            cadTitulo = "Nombre del area"
+            cadTabla = "" & rutaBD & ".cat_areas"
+            cadJoin = "c.area"
+        ElseIf idReporte = 4 Or idReporte = 17 Or idReporte = 30 Then
+            cadTitulo = "Nombre de la falla"
+            cadTabla = "" & rutaBD & ".cat_fallas"
+            cadJoin = "c.falla_ajustada"
+        ElseIf idReporte = 5 Or idReporte = 18 Or idReporte = 31 Then
+            cadTitulo = "Tipo de máquina"
+            cadTabla = "" & rutaBD & ".cat_maquinas"
+            cadJoin = "c.maquina"
+            cadCampo = "g.tipo"
+            numTabla = "50"
+        ElseIf idReporte = 6 Or idReporte = 19 Or idReporte = 32 Then
+            cadTitulo = "Agrupador (1) de máquina"
+            cadTabla = "" & rutaBD & ".cat_maquinas"
+            cadJoin = "c.maquina"
+            cadCampo = "g.agrupador_1"
+            numTabla = "20"
+        ElseIf idReporte = 7 Or idReporte = 20 Or idReporte = 33 Then
+            cadTitulo = "Agrupador (2) de máquina"
+            cadTabla = "" & rutaBD & ".cat_maquinas"
+            cadJoin = "c.maquina"
+            cadCampo = "g.agrupador_2"
+            numTabla = "25"
+        ElseIf idReporte = 8 Or idReporte = 21 Or idReporte = 34 Then
+            cadTitulo = "Agrupador (1) de falla"
+            cadTabla = "" & rutaBD & ".cat_fallas"
+            cadJoin = "c.falla_ajustada"
+            cadCampo = "g.agrupador_1"
+            numTabla = "40"
+        ElseIf idReporte = 9 Or idReporte = 22 Or idReporte = 35 Then
+            cadTitulo = "Agrupador (2) de falla"
+            cadTabla = "" & rutaBD & ".cat_fallas"
+            cadJoin = "c.falla_ajustada"
+            cadCampo = "g.agrupador_2"
+            numTabla = "45"
+        ElseIf idReporte = 10 Or idReporte = 23 Or idReporte = 36 Then
+            cadTitulo = "Dia"
+            cadGrafico = "Dia"
+            grupoFecha = "DATE_FORMAT(a.fecha, '%d/%m/%Y') AS nombre"
+            grupoFechaG = "DATE_FORMAT(a.fecha, '%d/%m/%Y') AS nombre"
+        ElseIf idReporte = 11 Or idReporte = 24 Or idReporte = 37 Then
+            cadTitulo = "Semana', 'Dia inicial de la semana"
+            cadGrafico = "Semana"
+            grupoFechaG = "DATE_FORMAT(a.fecha,'%x/%v') AS nombre"
+            grupoFecha = "DATE_FORMAT(a.fecha,'%x/%v') AS nombre, STR_TO_DATE(CONCAT(DATE_FORMAT(a.fecha,'%x/%v'), ' Monday'), '%x/%v %W')"
+        ElseIf idReporte = 12 Or idReporte = 25 Or idReporte = 38 Then
+            cadTitulo = "Mes"
+            cadGrafico = "Mes"
+            grupoFecha = "DATE_FORMAT(a.fecha,'%Y/%m') AS nombre"
+            grupoFechaG = "DATE_FORMAT(a.fecha,'%Y/%m') AS nombre"
+        ElseIf idReporte = 13 Or idReporte = 26 Or idReporte = 39 Then
+            cadTitulo = "Nombre del tecnico"
+            cadTabla = "" & rutaBD & ".cat_usuarios"
+            cadJoin = "c.tecnico"
+        End If
+
+        Dim Leer As Boolean = False
+
+        If idReporte = 42 Then
+            'Reporte de Reportes abiertas
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08, '' AS c09, '' AS c10, '' AS c11, '' AS c12, '' AS c13, '' AS c14, '' AS c15, '' AS c16, '' AS c17, '' AS c18, '' AS c19, '' AS c20, '' AS c21, '' AS c22, '' AS c23, '' AS c24, '' AS c25, '' AS c26, '' AS c27, '' AS c28, '' AS c29, '' AS c30, '' AS c31, '' AS c32, '' AS c33, '' AS c34 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT 'Numero', 'Inicio de la falla', 'Fecha para el reporte', 'Turno', 'Estatus', 'Fecha de llegada del tecnico', 'Tiempo esperado (segundos)', 'Fecha de resolucion de la falla', 'Tiempos de reparacion (segundos)', 'Tiempo total de la parada (segundos)', 'Inicio del reporte de mantenimiento', 'Fin del reporte de mantenimiento', 'Tiempo del reporte de mantenimiento (segundos)', 'Linea', 'ID de la linea', 'Maquina', 'ID de la maquina', 'Area que atendio', 'ID del area', 'Falla confirmada', 'ID de la falla confirmada', 'Usuario solicitante', 'Departamento del usuario', 'Tecnico que atendio el reporte', 'Tecnico que cerro el reporte', 'Usuario que confirmo la reparacion', 'Tipo de mantenimiento', 'Detalle de la falla (reporte tecnico)', 'Contabilizar?', 'Alarmado por reporte no cerrado a tiempo', 'Alarmado por tiempo de espera por tecnico excedido', 'Alarmado por tiempo de reparacion excedido', 'Falla reportada por el usuario', 'ID de la falla reportada') "
+            registros = "UNION SELECT c.id, c.fecha, c.fecha_reporte, IFNULL(l.nombre, 'N/A'), c.estatus, c.inicio_atencion, c.tiempollegada, c.cierre_atencion, c.tiemporeparacion, c.tiemporeparacion + c.tiempollegada, c.inicio_reporte, c.cierre_reporte, c.tiemporeporte, IFNULL(a.nombre, 'N/A'), c.linea, IFNULL(b.nombre, 'N/A'), c.maquina, IFNULL(d.nombre, 'N/A'), c.area, IFNULL(e.nombre, 'N/A'), c.falla_ajustada, IFNULL(f.nombre, 'N/A'), IFNULL(j.nombre, 'N/A'), IFNULL(h.nombre, 'N/A'), IFNULL(g.nombre, 'N/A'), IFNULL(m.nombre, 'N/A'), IFNULL(k.nombre, 'N/A'), c.detalle, IF(c.contabilizar = 'S', 'Si', 'No'), IF(c.alarmado = 'S', 'Si', 'No'), IF(c.alarmado_atender = 'S', 'Si', 'No'), IF(c.alarmado_atendido = 'S', 'Si', 'No'), IFNULL(i.nombre, 'N/A'), c.falla FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_lineas a ON c.linea = a.id LEFT JOIN " & rutaBD & ".cat_maquinas b ON c.maquina = b.id LEFT JOIN " & rutaBD & ".cat_areas d ON c.area = d.id LEFT JOIN " & rutaBD & ".cat_fallas e ON c.falla_ajustada = e.id LEFT JOIN " & rutaBD & ".cat_usuarios f ON c.solicitante = f.id LEFT JOIN " & rutaBD & ".cat_usuarios g ON g.tecnico = g.id LEFT JOIN " & rutaBD & ".cat_usuarios h ON c.tecnicoatend = h.id LEFT JOIN " & rutaBD & ".cat_fallas i ON c.falla = i.id LEFT JOIN " & rutaBD & ".cat_generales j ON f.departamento = j.id LEFT JOIN " & rutaBD & ".cat_generales k ON c.tipo = k.id LEFT JOIN " & rutaBD & ".cat_turnos l ON c.turno = l.id LEFT JOIN " & rutaBD & ".cat_usuarios m ON c.confirmado = m.id WHERE c.estatus >= 0 AND c.fecha_reporte >= '" & Strings.Left(fDesde, 10) & "' AND c.fecha_reporte <= '" & Strings.Left(fHasta, 10) & "'"
+        ElseIf idReporte = 27 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, c.referencia, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT nombre, referencia, linea AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_lineas d ON linea = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+        ElseIf idReporte = 28 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, c.referencia, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT nombre, referencia, maquina AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON maquina = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t   "
+        ElseIf idReporte = 29 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, c.referencia, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT nombre, referencia, area AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_areas d ON area = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t    "
+        ElseIf idReporte = 30 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, c.referencia, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT nombre, referencia, falla_ajustada AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON falla_ajustada = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t    "
+        ElseIf idReporte = 31 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT e.nombre, d.tipo AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.tipo = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+        ElseIf idReporte = 32 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT e.nombre, d.agrupador_1 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_1 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+        ElseIf idReporte = 33 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT e.nombre, d.agrupador_2 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_2 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+        ElseIf idReporte = 34 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT e.nombre, d.agrupador_1 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON c.falla_ajustada = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_1 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+        ElseIf idReporte = 35 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT e.nombre, d.agrupador_2 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON c.falla_ajustada = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_2 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+        ElseIf idReporte = 36 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT campo AS nombre, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT fecha_reporte AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+        ElseIf idReporte = 37 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT campo AS nombre, campo2, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT DATE_FORMAT(fecha_reporte,'%x/%v') AS campo, STR_TO_DATE(CONCAT(DATE_FORMAT(fecha_reporte,'%x/%v'), ' Monday'), '%x/%v %W') AS campo2, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY DATE_FORMAT(fecha_reporte,'%x/%v') ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+        ElseIf idReporte = 38 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT campo AS nombre, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT DATE_FORMAT(fecha_reporte,'%Y/%m') AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY DATE_FORMAT(fecha_reporte,'%Y/%m') ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+        ElseIf idReporte = 39 Then
+            inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+            cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Reportes cerrados', 'Total tiempo de reparación (seg)', 'Reportes acumulados', 'Total Reportes', 'Porcentaje') "
+            registros = "UNION SELECT IFNULL(c.nombre, 'N/A') AS nombre, c.referencia, campo, ttl, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS porcentaje FROM (SELECT nombre, referencia, c.tecnico AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_usuarios d ON c.tecnico = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+        ElseIf (idReporte >= 1 And idReporte <= 4 Or idReporte = 13) Or (idReporte >= 14 And idReporte <= 17 Or idReporte = 26) Then
+            If Not id01 And (idReporte = 14 Or idReporte = 1) Then
+                id01 = True
+                Leer = True
+            ElseIf Not id02 And (idReporte = 15 Or idReporte = 2) Then
+                id02 = True
+                Leer = True
+            ElseIf Not id03 And (idReporte = 16 Or idReporte = 3) Then
+                id03 = True
+                Leer = True
+            ElseIf Not id04 And (idReporte = 17 Or idReporte = 4) Then
+                id04 = True
+                Leer = True
+            ElseIf Not id13 And (idReporte = 26 Or idReporte = 13) Then
+                id13 = True
+                Leer = True
             End If
-        End If
-        If reporte = "T" Or reporte = "G" Then
-            'Se produce el gráfico
-            Dim cadSQL As String = "SELECT IFNULL(vw_alarmas.estacion, 'N/A') as estacion, COUNT(*) as total, ROUND(SUM(vw_alarmas.tiempo / 60), 0) as tiempo FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0 GROUP BY vw_alarmas.estacion ORDER BY 2 DESC"
-            Dim reader As DataSet = consultaSEL(cadSQL)
-            Dim regsAfectados = 0
-            If errorBD.Length > 0 Then
-                agregarLOG("Ocurrió un error al intentar leer MySQL. Error: " + Microsoft.VisualBasic.Strings.Left(errorBD, 250), 9, 0)
-                errorCorreos = errorBD
-                generarReporte2 = -1
-            Else
-                If reader.Tables(0).Rows.Count > 0 Then
-                    ChartControl1.Series.Clear()
-                    ChartControl1.Titles.Clear()
-                    Dim Titulo As New ChartTitle()
-                    Titulo.Text = "    Gráfica de Fallas por estación (frecuencia y tiempo)   "
-                    Dim miFuente = New Drawing.Font("Lucida Sans", 10, FontStyle.Regular)
-                    Dim miFuenteAlto = New Drawing.Font("Lucida Sans", 16, FontStyle.Bold)
-                    Dim miFuenteEjes = New Drawing.Font("Lucida Sans", 11, FontStyle.Regular)
-
-                    Titulo.Font = miFuenteAlto
-
-
-                    ' Create an empty table.
-                    Dim datos As New DataTable("grafico")
-
-                    ' Add two columns to the table.
-                    datos.Columns.Add("estacion", GetType(String))
-                    datos.Columns.Add("total", GetType(Int32))
-                    datos.Columns.Add("tiempo", GetType(Double))
-
-                    ' Add data rows to the table.
-                    Dim row As DataRow = Nothing
-                    For Each lineas In reader.Tables(0).Rows
-                        row = datos.NewRow()
-                        row("estacion") = lineas!estacion
-                        row("total") = lineas!total
-                        row("tiempo") = lineas!tiempo
-                        datos.Rows.Add(row)
-                    Next
-                    Dim series1 As New Series("Frecuencia", ViewType.Bar)
-                    Dim series2 As New Series("Tiempo (minuto)", ViewType.Spline)
-
-                    ChartControl1.Series.Add(series1)
-                    series1.DataSource = datos
-                    series1.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series1.View.Color = Color.SkyBlue
-                    series1.ArgumentScaleType = ScaleType.Qualitative
-                    series1.ArgumentDataMember = "estacion"
-                    series1.ValueScaleType = ScaleType.Numerical
-                    series1.ValueDataMembers.AddRange(New String() {"total"})
-                    series1.Label.BackColor = Color.DarkBlue
-                    series1.Label.TextColor = Color.White
-                    series1.Label.Font = miFuente
-
-                    ChartControl1.Series.Add(series2)
-                    series2.DataSource = datos
-                    series2.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series2.View.Color = Color.DarkGray
-                    series2.ArgumentScaleType = ScaleType.Qualitative
-                    series2.ArgumentDataMember = "estacion"
-                    series2.ValueScaleType = ScaleType.Numerical
-                    series2.ValueDataMembers.AddRange(New String() {"tiempo"})
-                    series2.Label.BackColor = Color.SlateGray
-                    series2.Label.TextColor = Color.White
-                    series2.Label.Font = miFuente
-
-                    ' Set some properties to get a nice-looking chart.
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Visibility = DevExpress.Utils.DefaultBoolean.True
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacingAuto = False
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacing = 1
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Text = "Número de llamadas en el período"
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Text = "    Estaciones con llamada    "
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-
-                    Dim myAxisY As New SecondaryAxisY("Y2Axis")
-                    CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Add(myAxisY)
-                    CType(series2.View, LineSeriesView).AxisY = myAxisY
-
-                    myAxisY.Title.Text = "Tiempo total (en minutos)"
-                    myAxisY.Title.Font = miFuenteAlto
-                    myAxisY.Title.Visible = True
-
-                    ChartControl1.Titles.Add(Titulo)
-                    Dim Titulo2 As New ChartTitle()
-
-                    Titulo2.Font = miFuente
-                    Titulo2.Text = "Extraccion de datos: " & cadPeriodo
-                    ChartControl1.Titles.Add(Titulo2)
-                    Dim Titulo3 As New ChartTitle()
-                    Titulo3.Font = miFuente
-                    Titulo3.Text = "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo3)
-                    Dim Titulo4 As New ChartTitle()
-                    Titulo4.Font = miFuente
-                    Titulo4.Text = "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " &
-                                Format(eHasta, "dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo4)
-                    ChartControl1.Width = 1000
-                    ChartControl1.Height = 700
-                    Try
-                        Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(archivoImagen, "\", "\\")
-                        SaveChartImageToFile(ChartControl1, ImageFormat.Png, rutaImagen)
-                        Dim image As Image = GetChartImage(ChartControl1, ImageFormat.Png)
-                        image.Save(rutaImagen)
-
-                    Catch ex As Exception
-                        agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " + ex.Message, 7, 0)
-                    End Try
-
-
-                    'No hay datos, notificar
-                End If
+            If Leer Then
+                inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07, '' AS c08 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '', '') "
+                cabecera = "UNION (SELECT '" & cadTitulo & "', 'Referencia', 'ID (numero unico)', 'Tiempo total de la falla (seg)', 'Reportes cerrados', 'Total tiempo disponible (seg)', 'Tiempo promedio de reparación (MTTR)', 'Tiempo promedio entre fallas (MTBF)') "
+                registros = "UNION SELECT a.nombre, a.referencia, a.id, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada), 0) AS tiempo_c, COUNT(c.id) AS docs, (e.lunes * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.martes * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.miercoles * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.jueves * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.viernes * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.sabado * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.domingo * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mtbfc FROM " & cadTabla & " a LEFT JOIN (SELECT id, tiemporeparacion, tiempollegada, maquina, tecnico, linea, area, falla_ajustada FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ") AS c ON a.id = " & cadJoin & " LEFT JOIN (SELECT maquina, tiempo FROM " & rutaBD & ".detalleparos f WHERE f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1) AS f ON c.maquina = f.maquina, (SELECT SUM(IF(dia = 2, 1, 0)) AS lunes, SUM(IF(dia = 3, 1, 0)) AS martes, SUM(IF(dia = 4, 1, 0)) AS miercoles, SUM(IF(dia = 5, 1, 0)) AS jueves, SUM(IF(dia = 6, 1, 0)) AS viernes, SUM(IF(dia = 7, 1, 0)) AS sabado, SUM(IF(dia = 1, 1, 0)) AS domingo FROM " & rutaBD & ".dias WHERE " & filtroFechas & ") AS e " & IIf(idReporte = 13, " WHERE (a.rol = 'T' OR a.rol = 'A')", "") & "GROUP BY a.nombre "
             End If
-        End If
-    End Function
-
-    Function generarReporte3(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-
-        generarReporte3 = 0
-
-        Dim archivoSaliente = ruta & "\fallas_por_tecnologia_tiempo.csv"
-        Dim archivoImagen = ruta & "\fallas_por_tecnologia_tiempo.png"
-
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte3 = -1
-                Exit Function
-            End Try
-        End If
-        Try
-            My.Computer.FileSystem.DeleteFile(archivoImagen)
-        Catch ex As Exception
-
-        End Try
-
-        archivoSaliente = archivoSaliente.Replace("\", "\\")
-
-        Dim eDesde = Now()
-        Dim eHasta = Now()
-        Dim ePeriodo = nperiodos
-        Dim diaSemana = DateAndTime.Weekday(Now)
-        Dim intervalo = DateInterval.Second
-        Dim cadPeriodo As String = nperiodos & " segundo(s) atras"
-        If periodo = 1 Then
-            intervalo = DateInterval.Minute
-            cadPeriodo = nperiodos & " minuto(s) atras"
-        ElseIf periodo = 2 Then
-            intervalo = DateInterval.Hour
-            cadPeriodo = nperiodos & " hora(s) atras"
-        ElseIf periodo = 3 Then
-            intervalo = DateInterval.Day
-            cadPeriodo = nperiodos & " día(s) atras"
-        ElseIf periodo = 4 Then
-            intervalo = DateInterval.Day
-            ePeriodo = 6
-            cadPeriodo = nperiodos & " semana(s) atras"
-        ElseIf periodo = 5 Then
-            intervalo = DateInterval.Month
-            cadPeriodo = nperiodos & " mes(es) atras"
-        ElseIf periodo = 6 Then
-            intervalo = DateInterval.Year
-            cadPeriodo = nperiodos & " año(s) atras"
-        ElseIf periodo = 10 Then
-            eDesde = CDate(Format(Now, "yyyy/MM/dd") & " 00:00:00")
-            cadPeriodo = "Lo que va del día de hoy"
-        ElseIf periodo = 11 Then
-            cadPeriodo = "Lo que va de la semana"
-            If diaSemana = 0 Then
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, -6, Now), "yyyy/MM/dd") & " 00:00:00")
-            Else
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, (diaSemana - 2) * -1, Now), "yyyy/MM/dd") & " 00:00:00")
+        ElseIf (idReporte >= 5 And idReporte <= 9) Or (idReporte >= 18 And idReporte <= 22) Then
+            If Not id05 And (idReporte = 18 Or idReporte = 5) Then
+                id05 = True
+                Leer = True
+            ElseIf Not id06 And (idReporte = 6 Or idReporte = 19) Then
+                id06 = True
+                Leer = True
+            ElseIf Not id07 And (idReporte = 7 Or idReporte = 20) Then
+                id07 = True
+                Leer = True
+            ElseIf Not id08 And (idReporte = 8 Or idReporte = 21) Then
+                id08 = True
+                Leer = True
+            ElseIf Not id09 And (idReporte = 9 Or idReporte = 22) Then
+                id09 = True
+                Leer = True
             End If
-        ElseIf periodo = 12 Then
-            cadPeriodo = "Lo que va del mes"
-            eDesde = CDate(Format(Now, "yyyy/MM") & "/01 00:00:00")
-        ElseIf periodo = 13 Then
-            cadPeriodo = "Lo que va del anyo"
-            eDesde = CDate(Format(Now, "yyyy") & "/01/01 00:00:00")
-        ElseIf periodo = 20 Then
-            cadPeriodo = "El día de ayer"
-            eDesde = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 23:59:59")
-        ElseIf periodo = 21 Then
-            cadPeriodo = "La semana pasada"
-            Dim dayDiff As Integer = Date.Today.DayOfWeek - DayOfWeek.Monday
-            eDesde = CDate(Format(Today.AddDays(-dayDiff), "yyyy/MM/dd") & " 00:00:00")
-            eDesde = DateAdd(DateInterval.Day, -7, CDate(eDesde))
-            eHasta = DateAdd(DateInterval.Day, 6, CDate(eDesde))
-        ElseIf periodo = 22 Then
-            cadPeriodo = "El mes pasado"
-            eDesde = CDate(Format(DateAdd(DateInterval.Month, -1, Now), "yyyy/MM") & "/01 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, CDate(Format(Now, "yyyy/MM") & "/01")), "yyyy/MM/dd") & " 23:59:59")
-        End If
-        If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
-        Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
-        Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
-        If reporte = "T" Or reporte = "D" Then
-
-            Dim comillas = Microsoft.VisualBasic.Strings.Left(Chr(34), 1)
-            Dim regsAfectados = consultaACT("USE sigma;
-SELECT * FROM 
-(SELECT 'Reporte de fallas atendidas por tecnoología - Frecuencia y tiempo(" & cadPeriodo & ")','' as b,'' as c,'' as d 
-UNION 
-(SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','') 
-UNION 
-(SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'),'','','') 
-UNION 
-(SELECT 'Tecnologia','Frecuencia','Tiempo total (min)','Tiempo total (seg)') 
-UNION
-(SELECT IFNULL(tecnologia, 'N/A'), COUNT(*), ROUND(SUM(vw_alarmas.tiempo / 60), 0), SUM(vw_alarmas.tiempo) AS tiempo FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0 GROUP BY tecnologia ORDER BY 2 DESC) 
-UNION 
-(SELECT 'TOTAL reporte: ', COUNT(*), ROUND(SUM(vw_alarmas.tiempo / 60), 0), SUM(vw_alarmas.tiempo) FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0)) as query01  
-INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
-            If errorBD.Length > 0 Then
-                errorCorreos = errorBD
-                agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-                generarReporte3 = -1
+            If Leer Then
+                inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+                cabecera = "UNION (SELECT '" & cadTitulo & "', 'ID (numero unico)', 'Tiempo total de la falla (seg)', 'Reportes cerrados', 'Total tiempo disponible (seg)', 'Tiempo promedio de reparación (MTTR)', 'Tiempo promedio entre fallas (MTBF)') "
+                registros = "UNION SELECT a.nombre, a.id, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada), 0) AS tiempo_c, COUNT(c.id) AS docs, (e.lunes * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.martes * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.miercoles * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.jueves * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.viernes * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.sabado * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.domingo * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mtbfc FROM " & rutaBD & ".cat_generales a LEFT JOIN " & cadTabla & " g ON a.id = " & cadCampo & " LEFT JOIN (SELECT id, tiemporeparacion, tiempollegada, maquina, linea, area, falla_ajustada FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ") AS c ON g.id = " & cadJoin & " LEFT JOIN (SELECT maquina, tiempo FROM " & rutaBD & ".detalleparos f WHERE f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1) AS f ON c.maquina = f.maquina, (SELECT SUM(IF(dia = 2, 1, 0)) AS lunes, SUM(IF(dia = 3, 1, 0)) AS martes, SUM(IF(dia = 4, 1, 0)) AS miercoles, SUM(IF(dia = 5, 1, 0)) AS jueves, SUM(IF(dia = 6, 1, 0)) AS viernes, SUM(IF(dia = 7, 1, 0)) AS sabado, SUM(IF(dia = 1, 1, 0)) AS domingo FROM " & rutaBD & ".dias WHERE " & filtroFechas & ") AS e WHERE a.tabla = " & numTabla & " GROUP BY a.nombre "
             End If
-        End If
-        If reporte = "T" Or reporte = "G" Then
-            'Se produce el gráfico
-            Dim cadSQL As String = "SELECT IFNULL(tecnologia, 'N/A') as estacion, COUNT(*) as total, ROUND(SUM(vw_alarmas.tiempo / 60), 0) as tiempo FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0 GROUP BY tecnologia ORDER BY 2 DESC"
-            Dim reader As DataSet = consultaSEL(cadSQL)
-            Dim regsAfectados = 0
-            If errorBD.Length > 0 Then
-                agregarLOG("Ocurrió un error al intentar leer MySQL. Error: " + Microsoft.VisualBasic.Strings.Left(errorBD, 250), 9, 0)
-                errorCorreos = errorBD
-                generarReporte3 = -1
-            Else
-                ChartControl1.Series.Clear()
-                ChartControl1.Titles.Clear()
+        ElseIf (idReporte >= 10 And idReporte <= 12) Or (idReporte >= 23 And idReporte <= 25) Then
+            If Not id10 And (idReporte = 10 Or idReporte = 23) Then
+                id10 = True
+                Leer = True
+            ElseIf Not id11 And (idReporte = 11 Or idReporte = 24) Then
+                id11 = True
+                Leer = True
+            ElseIf Not id12 And (idReporte = 12 Or idReporte = 25) Then
+                id12 = True
+                Leer = True
+            End If
+            If Leer And (idReporte = 10 Or idReporte = 23) Then
+                inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '') "
+                cabecera = "UNION (SELECT 'Dia', 'Tiempo total de la falla (seg)', 'Reportes cerrados', 'Total tiempo disponible (seg)', 'Tiempo promedio de reparación (MTTR)', 'Tiempo promedio entre fallas (MTBF)') "
 
-                If reader.Tables(0).Rows.Count > 0 Then
-                    Dim Titulo As New ChartTitle()
-                    Titulo.Text = "    Gráfica de Fallas por tecnología (frecuencia y tiempo)   "
-                    Dim miFuente = New Drawing.Font("Lucida Sans", 10, FontStyle.Regular)
-                    Dim miFuenteAlto = New Drawing.Font("Lucida Sans", 16, FontStyle.Bold)
-                    Dim miFuenteEjes = New Drawing.Font("Lucida Sans", 11, FontStyle.Regular)
-
-                    Titulo.Font = miFuenteAlto
-
-
-                    ' Create an empty table.
-                    Dim datos As New DataTable("grafico")
-
-                    ' Add two columns to the table.
-                    datos.Columns.Add("estacion", GetType(String))
-                    datos.Columns.Add("total", GetType(Int32))
-                    datos.Columns.Add("tiempo", GetType(Double))
-
-                    ' Add data rows to the table.
-                    Dim row As DataRow = Nothing
-                    For Each lineas In reader.Tables(0).Rows
-                        row = datos.NewRow()
-                        row("estacion") = lineas!estacion
-                        row("total") = lineas!total
-                        row("tiempo") = lineas!tiempo
-                        datos.Rows.Add(row)
-                    Next
-                    Dim series1 As New Series("Frecuencia", ViewType.Bar)
-                    Dim series2 As New Series("Tiempo (minuto)", ViewType.Spline)
-
-                    ChartControl1.Series.Add(series1)
-                    series1.DataSource = datos
-                    series1.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series1.View.Color = Color.SkyBlue
-                    series1.ArgumentScaleType = ScaleType.Qualitative
-                    series1.ArgumentDataMember = "estacion"
-                    series1.ValueScaleType = ScaleType.Numerical
-                    series1.ValueDataMembers.AddRange(New String() {"total"})
-                    series1.Label.BackColor = Color.DarkBlue
-                    series1.Label.TextColor = Color.White
-                    series1.Label.Font = miFuente
-
-                    ChartControl1.Series.Add(series2)
-                    series2.DataSource = datos
-                    series2.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
-                    series2.View.Color = Color.DarkGray
-                    series2.ArgumentScaleType = ScaleType.Qualitative
-                    series2.ArgumentDataMember = "estacion"
-                    series2.ValueScaleType = ScaleType.Numerical
-                    series2.ValueDataMembers.AddRange(New String() {"tiempo"})
-                    series2.Label.BackColor = Color.SlateGray
-                    series2.Label.TextColor = Color.White
-                    series2.Label.Font = miFuente
-
-                    ' Set some properties to get a nice-looking chart.
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Visibility = DevExpress.Utils.DefaultBoolean.True
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacingAuto = False
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacing = 1
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Text = "Número de llamadas en el período"
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.Font = miFuenteEjes
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Text = "    Tecnologías    "
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Font = miFuenteAlto
-                    CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
-
-                    Dim myAxisY As New SecondaryAxisY("Y2Axis")
-                    CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Clear()
-                    CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Add(myAxisY)
-                    CType(series2.View, LineSeriesView).AxisY = myAxisY
-
-                    myAxisY.Title.Text = "Tiempo total (en minutos)"
-                    myAxisY.Title.Font = miFuenteAlto
-                    myAxisY.Title.Visible = True
-
-                    ChartControl1.Titles.Add(Titulo)
-                    Dim Titulo2 As New ChartTitle()
-
-                    Titulo2.Font = miFuente
-                    Titulo2.Text = "Extraccion de datos: " & cadPeriodo
-                    ChartControl1.Titles.Add(Titulo2)
-                    Dim Titulo3 As New ChartTitle()
-                    Titulo3.Font = miFuente
-                    Titulo3.Text = "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo3)
-                    Dim Titulo4 As New ChartTitle()
-                    Titulo4.Font = miFuente
-                    Titulo4.Text = "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " &
-                                    Format(eHasta, "dd-MM-yyyy HH:mm:ss")
-                    ChartControl1.Titles.Add(Titulo4)
-                    ChartControl1.Width = 1000
-                    ChartControl1.Height = 700
-                    Try
-                        Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(archivoImagen, "\", "\\")
-                        SaveChartImageToFile(ChartControl1, ImageFormat.Png, rutaImagen)
-                        Dim image As Image = GetChartImage(ChartControl1, ImageFormat.Png)
-                        image.Save(rutaImagen)
-
-                    Catch ex As Exception
-                        agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " + ex.Message, 7, 0)
-                    End Try
-
-
-                    'No hay datos, notificar
-                End If
+                registros = "UNION SELECT a.fecha AS nombre, ROUND(IFNULL(SUM(c.tiemporeparacion + c.tiempollegada), 0)/ 3600, 1) AS tiempo_c, COUNT(c.id) AS docs, (IF(dia = 2, 1, 0) * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 3, 1, 0) * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 4, 1, 0) * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 5, 1, 0) * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 6, 1, 0) * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 7, 1, 0) * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + IF(dia = 1, 1, 0) * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mtbfc FROM " & rutaBD & ".dias a LEFT JOIN (SELECT id, maquina, linea, fecha_reporte, tiemporeparacion, tiempollegada FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ") AS c ON a.fecha = c.fecha_reporte LEFT JOIN (SELECT maquina, tiempo FROM " & rutaBD & ".detalleparos f WHERE f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1) AS f ON c.maquina = f.maquina WHERE " & filtroFechasDia & " GROUP BY nombre  "
+            ElseIf Leer And (idReporte = 11 Or idReporte = 24) Then
+                inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06, '' AS c07 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '', '') "
+                cabecera = "UNION (SELECT 'Semana', 'Lunes de la semana', 'Tiempo total de la falla (hr)', 'Reportes cerrados', 'Total tiempo disponible (seg)', 'Tiempo promedio de reparación (MTTR)', 'Tiempo promedio entre fallas (MTBF)') "
+                registros = "UNION SELECT DATE_FORMAT(a.fecha,'%x/%v') AS nombre, STR_TO_DATE(CONCAT(DATE_FORMAT(a.fecha,'%x/%v'), ' Monday'), '%x/%v %W'), ROUND(IFNULL(SUM(c.tiemporeparacion + c.tiempollegada), 0)/ 3600, 1) AS tiempo_c, COUNT(c.id) AS docs, ((SELECT COUNT(*) FROM dias WHERE dia = 2 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 3 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 4 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 5 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 6 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 7 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 1 AND DATE_FORMAT(a.fecha,'%x/%v') = DATE_FORMAT(fecha,'%x/%v') AND " & filtroFechas & ") * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mtbfc FROM " & rutaBD & ".dias a LEFT JOIN " & rutaBD & ".reportes c ON a.fecha = c.fecha_reporte AND c.contabilizar = 'S' AND c.estatus >= 100 LEFT JOIN " & rutaBD & ".detalleparos f ON c.maquina = f.maquina AND f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1 WHERE " & filtroFechasDia & " GROUP BY DATE_FORMAT(a.fecha,'%x/%v') "
+            ElseIf Leer And (idReporte = 12 Or idReporte = 25) Then
+                inicial = "USE sigma; SELECT * FROM (SELECT '" & reporte & " (" & cadPeriodo & ")' AS c01, '' AS c02, '' AS c03, '' AS c04, '' AS c05, '' AS c06 UNION (SELECT CONCAT('Reporte generado en fecha: ', NOW()), '', '', '', '', '') UNION (SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'), '', '', '', '', '') "
+                cabecera = "UNION (SELECT 'Mes', 'Tiempo total de la falla (hr)', 'Reportes cerrados', 'Total tiempo disponible (seg)', 'Tiempo promedio de reparación (MTTR)', 'Tiempo promedio entre fallas (MTBF)') "
+                registros = "UNION SELECT DATE_FORMAT(a.fecha,'%Y%m') AS nombre, ROUND(IFNULL(SUM(c.tiemporeparacion + c.tiempollegada), 0)/ 3600, 1) AS tiempo_c, COUNT(c.id) AS docs, ((SELECT COUNT(*) FROM dias WHERE dia = 2 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 3 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 4 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 5 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 6 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 7 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + (SELECT COUNT(*) FROM dias WHERE dia = 1 AND DATE_FORMAT(a.fecha,'%Y%m') = DATE_FORMAT(fecha,'%Y%m') AND " & filtroFechas & ") * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mtbfc FROM " & rutaBD & ".dias a LEFT JOIN " & rutaBD & ".reportes c ON a.fecha = c.fecha_reporte AND c.contabilizar = 'S' AND c.estatus >= 100 LEFT JOIN " & rutaBD & ".detalleparos f ON c.maquina = f.maquina AND f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1 WHERE " & filtroFechasDia & " GROUP BY DATE_FORMAT(a.fecha,'%Y%m') "
             End If
         End If
 
-    End Function
-
-    Function generarReporte4(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-        generarReporte4 = 0
-
-        Dim archivoSaliente = ruta & "\top_10_fallas.csv"
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte4 = -1
-                Exit Function
-            End Try
-        End If
-        archivoSaliente = archivoSaliente.Replace("\", "\\")
-
-        Dim eDesde = Now()
-        Dim eHasta = Now()
-        Dim ePeriodo = nperiodos
-        Dim diaSemana = DateAndTime.Weekday(Now)
-        Dim intervalo = DateInterval.Second
-        Dim cadPeriodo As String = nperiodos & " segundo(s) atras"
-        If periodo = 1 Then
-            intervalo = DateInterval.Minute
-            cadPeriodo = nperiodos & " minuto(s) atras"
-        ElseIf periodo = 2 Then
-            intervalo = DateInterval.Hour
-            cadPeriodo = nperiodos & " hora(s) atras"
-        ElseIf periodo = 3 Then
-            intervalo = DateInterval.Day
-            cadPeriodo = nperiodos & " día(s) atras"
-        ElseIf periodo = 4 Then
-            intervalo = DateInterval.Day
-            ePeriodo = 6
-            cadPeriodo = nperiodos & " semana(s) atras"
-        ElseIf periodo = 5 Then
-            intervalo = DateInterval.Month
-            cadPeriodo = nperiodos & " mes(es) atras"
-        ElseIf periodo = 6 Then
-            intervalo = DateInterval.Year
-            cadPeriodo = nperiodos & " año(s) atras"
-        ElseIf periodo = 10 Then
-            eDesde = CDate(Format(Now, "yyyy/MM/dd") & " 00:00:00")
-            cadPeriodo = "Lo que va del día de hoy"
-        ElseIf periodo = 11 Then
-            cadPeriodo = "Lo que va de la semana"
-            If diaSemana = 0 Then
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, -6, Now), "yyyy/MM/dd") & " 00:00:00")
-            Else
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, (diaSemana - 2) * -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            End If
-        ElseIf periodo = 12 Then
-            cadPeriodo = "Lo que va del mes"
-            eDesde = CDate(Format(Now, "yyyy/MM") & "/01 00:00:00")
-        ElseIf periodo = 13 Then
-            cadPeriodo = "Lo que va del anyo"
-            eDesde = CDate(Format(Now, "yyyy") & "/01/01 00:00:00")
-        ElseIf periodo = 20 Then
-            cadPeriodo = "El día de ayer"
-            eDesde = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 23:59:59")
-        ElseIf periodo = 21 Then
-            cadPeriodo = "La semana pasada"
-            Dim dayDiff As Integer = Date.Today.DayOfWeek - DayOfWeek.Monday
-            eDesde = CDate(Format(Today.AddDays(-dayDiff), "yyyy/MM/dd") & " 00:00:00")
-            eDesde = DateAdd(DateInterval.Day, -7, CDate(eDesde))
-            eHasta = DateAdd(DateInterval.Day, 6, CDate(eDesde))
-        ElseIf periodo = 22 Then
-            cadPeriodo = "El mes pasado"
-            eDesde = CDate(Format(DateAdd(DateInterval.Month, -1, Now), "yyyy/MM") & "/01 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, CDate(Format(Now, "yyyy/MM") & "/01")), "yyyy/MM/dd") & " 23:59:59")
-        End If
-        If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
-        Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
-        Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
-
-        Dim comillas = Chr(34)
-        comillas = Microsoft.VisualBasic.Strings.Left(comillas, 1)
-        Dim regsAfectados = consultaACT("USE sigma;SET @'ROWE':= 0;SELECT * FROM 
-(SELECT 'Reporte de fallas más comunes (" & cadPeriodo & ")','' as b,'' as c,'' as d,'' as e,'' as f ,'' as g 
-UNION 
-(SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','','', '', '') 
-UNION 
-(SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'),'','','','', '', '') 
-UNION 
-(SELECT '#','Estacion','Falla','Responsable','Frecuencia (veces)','Tiempo total (min)','Tiempo total (seg)') 
-UNION
-(SELECT @'ROWE':= @'ROWE' + 1, estacion, descripcion, responsable, total, mins, segs FROM (SELECT estacion, codigo, responsable, COUNT(*) as total, ROUND(SUM(vw_alarmas.tiempo / 60), 0) as mins, SUM(vw_alarmas.tiempo) as segs FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" + fDesde + "' AND vw_alarmas.inicio <= '" + fHasta + "' AND vw_alarmas.tiempo > 0 GROUP BY estacion, codigo, responsable ORDER BY 5 DESC LIMIT 10) AS temp2) 
-UNION 
-(SELECT '','','','',COUNT(*), ROUND(SUM(vw_alarmas.tiempo / 60), 0), SUM(vw_alarmas.tiempo) FROM sigma.alarmas WHERE vw_alarmas.inicio >= '" & fDesde & "' AND vw_alarmas.inicio <= '" & fHasta & "' AND vw_alarmas.tiempo > 0)) as query01  
-INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
+        Dim regsAfectados = consultaACT(inicial & cabecera & registros & ") AS query01 INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
         If errorBD.Length > 0 Then
             errorCorreos = errorBD
             agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-            generarReporte4 = -1
+            generarReporte = -1
         End If
-
-    End Function
-
-    Function generarReporte5(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-        generarReporte5 = 0
-
-        Dim archivoSaliente = ruta & "\rendimiento_staff.csv"
-
-
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte5 = -1
-                Exit Function
-            End Try
-        End If
-        Dim archivoImagen = ruta & "\rendimiento_staff.png"
-        Try
-            My.Computer.FileSystem.DeleteFile(archivoImagen)
-        Catch ex As Exception
-
-        End Try
-        archivoSaliente = archivoSaliente.Replace("\", "\\")
-
-        Dim eDesde = Now()
-        Dim eHasta = Now()
-        Dim ePeriodo = nperiodos
-        Dim diaSemana = DateAndTime.Weekday(Now)
-        Dim intervalo = DateInterval.Second
-        Dim cadPeriodo As String = nperiodos & " segundo(s) atras"
-        If periodo = 1 Then
-            intervalo = DateInterval.Minute
-            cadPeriodo = nperiodos & " minuto(s) atras"
-        ElseIf periodo = 2 Then
-            intervalo = DateInterval.Hour
-            cadPeriodo = nperiodos & " hora(s) atras"
-        ElseIf periodo = 3 Then
-            intervalo = DateInterval.Day
-            cadPeriodo = nperiodos & " día(s) atras"
-        ElseIf periodo = 4 Then
-            intervalo = DateInterval.Day
-            ePeriodo = 6
-            cadPeriodo = nperiodos & " semana(s) atras"
-        ElseIf periodo = 5 Then
-            intervalo = DateInterval.Month
-            cadPeriodo = nperiodos & " mes(es) atras"
-        ElseIf periodo = 6 Then
-            intervalo = DateInterval.Year
-            cadPeriodo = nperiodos & " año(s) atras"
-        ElseIf periodo = 10 Then
-            eDesde = CDate(Format(Now, "yyyy/MM/dd") & " 00:00:00")
-            cadPeriodo = "Lo que va del día de hoy"
-        ElseIf periodo = 11 Then
-            cadPeriodo = "Lo que va de la semana"
-            If diaSemana = 0 Then
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, -6, Now), "yyyy/MM/dd") & " 00:00:00")
-            Else
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, (diaSemana - 2) * -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            End If
-        ElseIf periodo = 12 Then
-            cadPeriodo = "Lo que va del mes"
-            eDesde = CDate(Format(Now, "yyyy/MM") & "/01 00:00:00")
-        ElseIf periodo = 13 Then
-            cadPeriodo = "Lo que va del anyo"
-            eDesde = CDate(Format(Now, "yyyy") & "/01/01 00:00:00")
-        ElseIf periodo = 20 Then
-            cadPeriodo = "El día de ayer"
-            eDesde = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 23:59:59")
-        ElseIf periodo = 21 Then
-            cadPeriodo = "La semana pasada"
-            Dim dayDiff As Integer = Date.Today.DayOfWeek - DayOfWeek.Monday
-            eDesde = CDate(Format(Today.AddDays(-dayDiff), "yyyy/MM/dd") & " 00:00:00")
-            eDesde = DateAdd(DateInterval.Day, -7, CDate(eDesde))
-            eHasta = DateAdd(DateInterval.Day, 6, CDate(eDesde))
-        ElseIf periodo = 22 Then
-            cadPeriodo = "El mes pasado"
-            eDesde = CDate(Format(DateAdd(DateInterval.Month, -1, Now), "yyyy/MM") & "/01 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, CDate(Format(Now, "yyyy/MM") & "/01")), "yyyy/MM/dd") & " 23:59:59")
-        End If
-        If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
-        Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
-        Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
-        If reporte = "T" Or reporte = "D" Then
-
-            Dim comillas = Microsoft.VisualBasic.Strings.Left(Chr(34), 1)
-            Dim regsAfectados = consultaACT("USE sigma;SELECT 'Reporte de rendimiento por STAFF (" & cadPeriodo & ")','','','','','','' UNION ALL SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','','','','' UNION ALL SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'),'','','','','','' UNION ALL 
-SELECT 'Responsable','Total fallas atendidas','Rendimiento (sólo cerradas)','Promedio','Atendidas en tiempo','Atendidas ya escaladas','Sin atender' 
-UNION ALL 
-SELECT vw_alarmas.responsable, SUM(IF(vw_alarmas.tiempo > 0, 1, 0)), ROUND(SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) / (SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) + SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0))) * 100, 0), SEC_TO_TIME(ROUND(SUM(vw_alarmas.tiempo) / SUM(IF(vw_alarmas.tiempo > 0, 1, 0)), 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0)), SUM(IF(vw_alarmas.tiempo = 0, 1, 0)) FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.inicio >= '" & fDesde & "' AND vw_alarmas.inicio <= '" & fHasta & "' GROUP BY vw_alarmas.responsable 
-UNION ALL 
-SELECT '" & cad_consolidado & "', SUM(IF(vw_alarmas.tiempo > 0, 1, 0)), ROUND(SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) / (SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) + SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0))) * 100, 0), SEC_TO_TIME(ROUND(SUM(vw_alarmas.tiempo) / COUNT(*), 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0)), SUM(IF(vw_alarmas.tiempo = 0, 1, 0)) FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.inicio >= '" & fDesde & "' AND vw_alarmas.inicio <= '" & fHasta & "' 
-INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
-            If errorBD.Length > 0 Then
-                errorCorreos = errorBD
-                agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-                generarReporte5 = -1
-            End If
-        End If
-        If reporte = "T" Or reporte = "G" Then
+        If graficar = "S" Then
             'Se produce el gráfico
-            Dim cadSQL As String = "SELECT IFNULL(vw_alarmas.responsable, 'N/A') as responsable, SUM(IF(vw_alarmas.tiempo > 0, 1, 0)) tiempo, ROUND(SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) / (SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) + SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0))) * 100, 0) as prom, SEC_TO_TIME(ROUND(SUM(vw_alarmas.tiempo) / SUM(IF(vw_alarmas.tiempo > 0, 1, 0)), 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0)), SUM(IF(vw_alarmas.tiempo = 0, 1, 0)) FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.inicio >= '" & fDesde & "' AND vw_alarmas.inicio <= '" & fHasta & "' GROUP BY vw_alarmas.responsable"
-            Dim reader As DataSet = consultaSEL(cadSQL)
-            Dim regsAfectados = 0
+            Dim cadSQL = ""
+            If idReporte >= 1 And idReporte <= 13 Then
+                cadSQL = "SELECT * FROM " & rutaBD & ".pu_graficos WHERE (usuario = 1 OR usuario = 0) AND grafico = " & 100 + idReporte & " ORDER BY usuario DESC LIMIT 1"
+            ElseIf idReporte >= 14 And idReporte <= 26 Then
+                cadSQL = "SELECT * FROM " & rutaBD & ".pu_graficos WHERE (usuario = 1 OR usuario = 0) AND grafico = " & 200 + idReporte - 13 & " ORDER BY usuario DESC LIMIT 1"
+            ElseIf idReporte >= 27 And idReporte <= 39 Then
+                cadSQL = "SELECT * FROM " & rutaBD & ".pu_graficos WHERE (usuario = 1 OR usuario = 0) AND grafico = " & 300 + idReporte - 26 & " ORDER BY usuario DESC LIMIT 1"
+            End If
+
+            Dim config As DataSet = consultaSEL(cadSQL)
+            regsAfectados = 0
             If errorBD.Length > 0 Then
                 agregarLOG("Ocurrió un error al intentar leer MySQL. Error: " + Microsoft.VisualBasic.Strings.Left(errorBD, 250), 9, 0)
                 errorCorreos = errorBD
-                generarReporte5 = -1
+                generarReporte = -1
             Else
-                Dim lineaGauge = 0
-                Dim miFuente = New Drawing.Font("Lucida Sans", 12, FontStyle.Regular)
-                Dim circular As New CircularGauge
-                For Each lineas In reader.Tables(0).Rows
-                    If lineaGauge = 7 Then
-                        Exit For
+                If config.Tables(0).Rows.Count > 0 Then
+                    Dim cadOrden As String = ""
+                    If idReporte >= 1 And idReporte <= 4 Or idReporte = 13 Then
+                        cadOrden = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " ORDER BY 3 DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " ORDER BY 3", "ORDER BY a.nombre"))
+                        registros = "SELECT a.nombre, COUNT(c.id) AS docs, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc FROM " & cadTabla & " a LEFT JOIN " & rutaBD & ".reportes c ON a.id = " & cadJoin & " AND c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & IIf(idReporte = 13, " WHERE (a.rol = 'A' OR a.rol = 'T') ", "") & " GROUP BY a.nombre " & IIf(config.Tables(0).Rows(0)!incluir_ceros = "N", "HAVING docs > 0 ", "") & cadOrden
+
+                    ElseIf idReporte = 27 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS pct FROM (SELECT nombre, referencia, linea AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_lineas d ON linea = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+                    ElseIf idReporte = 28 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS pct FROM (SELECT nombre, referencia, maquina AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON maquina = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+                    ElseIf idReporte = 29 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS pct FROM (SELECT nombre, referencia, area AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_areas d ON area = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+                    ElseIf idReporte = 30 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS pct FROM (SELECT nombre, referencia, falla_ajustada AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON falla_ajustada = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+                    ElseIf idReporte = 31 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT e.nombre, d.tipo AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.tipo = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 32 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT e.nombre, d.agrupador_1 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_1 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 33 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT e.nombre, d.agrupador_2 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.maquina = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_2 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 34 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT e.nombre, d.agrupador_1 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON c.falla_ajustada = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_1 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 35 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, campo, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT e.nombre, d.agrupador_2 AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_fallas d ON c.falla_ajustada = d.id LEFT JOIN " & rutaBD & ".cat_generales e ON d.agrupador_2 = e.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 3 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 36 Then
+
+
+                        registros = "SELECT campo AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT DATE_FORMAT(fecha_reporte, '%d/%m/%Y') AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY DATE_FORMAT(fecha_reporte, '%d/%m/%Y') ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 37 Then
+
+
+                        registros = "SELECT campo AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT DATE_FORMAT(fecha_reporte,'%x/%v') AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY DATE_FORMAT(fecha_reporte,'%x/%v') ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 38 Then
+
+
+                        registros = "SELECT campo AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, @total / t.total * 100 AS pct FROM (SELECT DATE_FORMAT(fecha_reporte,'%Y/%m') AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY DATE_FORMAT(fecha_reporte,'%Y/%m') ORDER BY 2 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t "
+
+                    ElseIf idReporte = 39 Then
+
+
+                        registros = "SELECT IFNULL(c.nombre, 'N/A') AS nombre, ttl AS mttrc, tiempottl, @total := @total + c.ttl AS acumulado, t.total, @total / t.total * 100 AS pct FROM (SELECT nombre, referencia, c.tecnico AS campo, COUNT(*) AS ttl, SUM(tiemporeparacion + tiempollegada) AS tiempottl FROM " & rutaBD & ".reportes c LEFT JOIN " & rutaBD & ".cat_usuarios d ON c.tecnico = d.id WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY campo ORDER BY 4 DESC) c, (SELECT @total := 0) AS total, (SELECT COUNT(*) AS total FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ")  AS t  "
+
+                    ElseIf idReporte >= 5 And idReporte <= 9 Then
+                        cadOrden = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " ORDER BY 3 DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " ORDER BY 3", "ORDER BY a.nombre"))
+                        registros = "SELECT a.nombre, COUNT(c.id) AS docs, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc FROM " & rutaBD & ".cat_generales a LEFT JOIN " & cadTabla & " g ON a.id = " & cadCampo & " LEFT JOIN " & rutaBD & ".reportes c ON g.id = " & cadJoin & " AND c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " WHERE a.tabla = " & numTabla & " GROUP BY a.nombre " & IIf(config.Tables(0).Rows(0)!incluir_ceros = "N", "HAVING docs > 0 ", "") & cadOrden
+                    ElseIf idReporte >= 10 And idReporte <= 12 Then
+                        cadOrden = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " ORDER BY 3 DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " ORDER BY 3", "ORDER BY a.nombre"))
+                        registros = "SELECT " & grupoFecha & ", COUNT(c.id) AS docs, IFNULL(SUM(c.tiemporeparacion + c.tiempollegada) / 3600 / COUNT(c.id), 0) AS mttrc FROM " & rutaBD & ".dias a LEFT JOIN " & rutaBD & ".reportes c ON a.fecha = c.fecha_reporte AND c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & " GROUP BY nombre " & IIf(config.Tables(0).Rows(0)!incluir_ceros = "N", "HAVING docs > 0 ", "") & cadOrden
+                    ElseIf idReporte >= 14 And idReporte <= 17 Or idReporte = 26 Then
+                        cadOrden = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " ORDER BY 4 DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " ORDER BY 4", "ORDER BY a.nombre"))
+                        registros = "SELECT a.nombre, COUNT(c.id) AS docs, (e.lunes * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.martes * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.miercoles * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.jueves * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.viernes * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.sabado * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.domingo * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mttrc FROM " & cadTabla & " a LEFT JOIN (SELECT id, linea, maquina, area, falla_ajustada, tecnico FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ") AS c ON a.id = " & cadJoin & " LEFT JOIN (SELECT maquina, tiempo FROM " & rutaBD & ".detalleparos f WHERE f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1) AS f ON c.maquina = f.maquina, (SELECT SUM(IF(dia = 2, 1, 0)) AS lunes, SUM(IF(dia = 3, 1, 0)) AS martes, SUM(IF(dia = 4, 1, 0)) AS miercoles, SUM(IF(dia = 5, 1, 0)) AS jueves, SUM(IF(dia = 6, 1, 0)) AS viernes, SUM(IF(dia = 7, 1, 0)) AS sabado, SUM(IF(dia = 1, 1, 0)) AS domingo FROM " & rutaBD & ".dias WHERE " & filtroFechas & ") AS e " & IIf(idReporte = 26, " WHERE (a.rol = 'T' OR a.rol = 'A')", "") & " GROUP BY a.nombre " & IIf(config.Tables(0).Rows(0)!incluir_ceros = "N", "HAVING docs > 0 ", "") & cadOrden
+                    ElseIf idReporte >= 18 And idReporte <= 22 Then
+                        cadOrden = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " ORDER BY 4 DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " ORDER BY 4", "ORDER BY a.nombre"))
+                        registros = "SELECT a.nombre, COUNT(c.id) AS docs, (e.lunes * IFNULL((SELECT lunes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.martes * IFNULL((SELECT martes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.miercoles * IFNULL((SELECT miercoles FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.jueves * IFNULL((SELECT jueves FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.viernes * IFNULL((SELECT viernes FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.sabado * IFNULL((SELECT sabado FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0) + e.domingo * IFNULL((SELECT domingo FROM " & rutaBD & ".disponibilidad WHERE (estatus = 'A') AND ((c.linea = linea) OR (c.maquina = maquina) OR (maquina = 0 AND linea = 0)) ORDER BY maquina DESC, linea DESC LIMIT 1), 0)) AS tdisponible, ((SELECT tdisponible) - IFNULL(SUM(f.tiempo), 0)) / IF(COUNT(c.id) = 0, 1, COUNT(c.id)) / 3600 AS mttrc FROM " & rutaBD & ".cat_generales a LEFT JOIN " & cadTabla & " g ON a.id = " & cadCampo & " LEFT JOIN (SELECT id, linea, maquina, falla_ajustada FROM " & rutaBD & ".reportes c WHERE c.contabilizar = 'S' AND c.estatus >= 100 " & filtroReportes & ") AS c ON g.id = " & cadJoin & " LEFT JOIN (SELECT maquina, tiempo FROM " & rutaBD & ".detalleparos f WHERE f.contabilizar = 'S' " & filtroParos & " AND f.tipo = 1) AS f ON c.maquina = f.maquina, (SELECT SUM(IF(dia = 2, 1, 0)) AS lunes, SUM(IF(dia = 3, 1, 0)) AS martes, SUM(IF(dia = 4, 1, 0)) AS miercoles, SUM(IF(dia = 5, 1, 0)) AS jueves, SUM(IF(dia = 6, 1, 0)) AS viernes, SUM(IF(dia = 7, 1, 0)) AS sabado, SUM(IF(dia = 1, 1, 0)) AS domingo FROM " & rutaBD & ".dias WHERE " & filtroFechas & ") AS e WHERE a.tabla = " & numTabla & " GROUP BY a.nombre " & IIf(config.Tables(0).Rows(0)!incluir_ceros = "N", "HAVING docs > 0 ", "") & cadOrden
                     End If
 
-                    circular = GaugeControl1.Gauges(lineaGauge)
-                    circular.BeginUpdate()
+                    Dim indicador01 = "MTTR"
+                    Dim indicador02 = "PCT"
 
-                    circular.Scales(0).Ranges(0).EndValue = bajo_hasta
-                    circular.Scales(0).Ranges(1).StartValue = bajo_hasta
-                    circular.Scales(0).Ranges(1).EndValue = medio_hasta
-                    circular.Scales(0).Ranges(2).StartValue = medio_hasta
-                    circular.Scales(0).Ranges(0).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(bajo_color))
-                    circular.Scales(0).Ranges(1).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(medio_color))
-                    circular.Scales(0).Ranges(2).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(alto_color))
+                    Dim graficos As DataSet = consultaSEL(registros)
+                    If graficos.Tables(0).Rows.Count > 0 Then
+                        If idReporte >= 1 And idReporte <= 26 Then
+                            If idReporte >= 1 And idReporte <= 13 Then
+                                indicador01 = "MTTR"
+                                indicador02 = "MTTR"
+                            ElseIf idReporte >= 14 And idReporte <= 26 Then
+                                indicador01 = "MTBF"
+                                indicador02 = "MTBF"
+                            End If
 
-                    Dim promedio = ValNull(lineas!prom, "N")
+                            ChartControl1.Series.Clear()
+                            ChartControl1.Titles.Clear()
+                            Dim Titulo As New ChartTitle()
+                            Titulo.Text = config.Tables(0).Rows(0)!titulo & Strings.Space(10)
+                            Dim miFuente = New Drawing.Font("Lucida Sans", 10, FontStyle.Regular)
+                            Dim miFuenteAlto = New Drawing.Font("Lucida Sans", 16, FontStyle.Bold)
+                            Dim miFuenteEjes = New Drawing.Font("Lucida Sans", 11, FontStyle.Regular)
 
-                    Dim label As LabelComponent = New LabelComponent("myLabel")
-                    label.AppearanceText.TextBrush = New SolidBrushObject(Color.Black)
-                    label.Position = New PointF2D(125, 250)
-                    label.Size = New Size(300, 300)
-                    label.ZOrder = -10000
-                    label.Text = lineas!responsable
-                    Dim label2 As LabelComponent = New LabelComponent("myLabel")
-                    label2.AppearanceText.TextBrush = New SolidBrushObject(Color.Black)
-                    label2.Position = New PointF2D(125, 270)
-                    label2.Size = New Size(300, 300)
-                    label2.ZOrder = -10000
-                    label2.Text = "Rendimiento: " & promedio & "%"
-                    circular.Scales(0).Labels.Add(label)
-                    circular.Scales(0).Labels.Add(label2)
-                    circular.Scales(0).Value = promedio
-                    circular.Scales(0).Labels(0).AppearanceText.Font = miFuente
-                    circular.Scales(0).Labels(1).AppearanceText.Font = miFuente
-                    circular.EndUpdate()
-                    lineaGauge = lineaGauge + 1
+                            Titulo.Font = miFuenteAlto
+                            Dim tabla_grafico As New DataTable("grafico")
 
-                Next
-                If lineaGauge < 7 Then
-                    For i = 7 To lineaGauge + 1 Step -1
-                        Dim circular2 As CircularGauge = CType(GaugeControl1.Gauges(i), CircularGauge)
-                        GaugeControl1.Gauges.Remove(circular2)
-                    Next
+                            ' Create an empty table.
+                            Dim datos As New DataTable("grafico")
+                            Dim row As DataRow = Nothing
+                            datos.Columns.Add("orden", GetType(String))
+                            datos.Columns.Add("estacion", GetType(String))
+                            datos.Columns.Add("total", GetType(Decimal))
+                            tabla_grafico.Columns.Add("orden", GetType(String))
+                            tabla_grafico.Columns.Add("estacion", GetType(String))
+                            tabla_grafico.Columns.Add("total", GetType(Decimal))
+
+                            For Each lineas In graficos.Tables(0).Rows
+                                row = datos.NewRow()
+                                row("orden") = "A"
+                                row("estacion") = lineas!nombre
+                                row("total") = lineas!mttrc
+                                datos.Rows.Add(row)
+                            Next
+
+                            If config.Tables(0).Rows(0)!maximo_barras > 0 Or config.Tables(0).Rows(0)!maximo_barraspct > 0 Then
+                                Dim TotalVal = 0
+                                Dim tBarras = 0
+                                Dim valAcum = 0
+                                Dim varios = 0
+                                Dim valAgrupado = 0
+                                For Each filas In datos.Rows
+                                    TotalVal = TotalVal + filas!total
+                                    tBarras = tBarras + 1
+                                Next
+                                If tBarras > config.Tables(0).Rows(0)!maximo_barras Or (config.Tables(0).Rows(0)!maximo_barraspct > 0 And config.Tables(0).Rows(0)!maximo_barraspct < 100) Then
+                                    Dim view As DataView = New DataView(datos)
+                                    Dim tmpTabla As New DataTable("grafico")
+                                    ' Create an empty table.
+                                    tmpTabla.Columns.Add("orden", GetType(String))
+                                    tmpTabla.Columns.Add("estacion", GetType(String))
+                                    tmpTabla.Columns.Add("total", GetType(Decimal))
+
+
+                                    view.Sort = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+                                    Dim tabla_ordenada As DataTable = view.ToTable()
+                                    tBarras = 0
+                                    valAcum = 0
+                                    For Each filas In tabla_ordenada.Rows
+                                        valAcum = valAcum + filas!total
+                                        tBarras = tBarras + 1
+                                        If tBarras > config.Tables(0).Rows(0)!maximo_barras Or ((valAcum / TotalVal * 100) > config.Tables(0).Rows(0)!maximo_barraspct And config.Tables(0).Rows(0)!maximo_barraspct > 0) Then
+                                            valAgrupado = valAgrupado + filas!total
+                                            varios = varios + 1
+                                        Else
+                                            row = tmpTabla.NewRow()
+                                            row("orden") = "B"
+                                            row("estacion") = filas!estacion
+                                            row("total") = filas!total
+                                            tmpTabla.Rows.Add(row)
+                                        End If
+                                    Next
+                                    If valAgrupado > 0 And config.Tables(0).Rows(0)!agrupar = "S" Then
+                                        Dim cadAgrupado As String = ValNull(config.Tables(0).Rows(0)!agrupar_texto, "A")
+                                        If cadAgrupado.Length = 0 Then cadAgrupado = "AGRUPADO"
+                                        cadAgrupado = cadAgrupado & " (" & varios & ")"
+                                        row = tmpTabla.NewRow()
+                                        If config.Tables(0).Rows(0)!agrupar_posicion = "P" Then
+                                            row("orden") = "A"
+                                        ElseIf config.Tables(0).Rows(0)!agrupar_posicion = "F" Then
+                                            row("orden") = "Z"
+                                        End If
+                                        row("estacion") = cadAgrupado
+                                        row("total") = valAgrupado
+                                        tmpTabla.Rows.Add(row)
+                                    End If
+                                    Dim view_o As DataView = New DataView(tmpTabla)
+                                    If config.Tables(0).Rows(0)!agrupar_posicion = "O" Then
+                                        view_o.Sort = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+
+                                    Else
+                                        view_o.Sort = "orden ASC," & IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+                                    End If
+                                    tabla_grafico = view_o.ToTable()
+                                Else
+                                    tabla_grafico = datos
+                                End If
+                            Else
+                                tabla_grafico = datos
+                            End If
+                            Dim series1 As New Series(indicador01, ViewType.Bar)
+
+                            ChartControl1.Series.Add(series1)
+                            series1.DataSource = tabla_grafico
+                            series1.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
+                            series1.View.Color = Color.SkyBlue
+                            series1.ArgumentScaleType = ScaleType.Qualitative
+                            series1.ArgumentDataMember = "estacion"
+                            series1.ValueScaleType = ScaleType.Numerical
+                            series1.ValueDataMembers.AddRange(New String() {"total"})
+                            series1.Label.BackColor = Color.DarkBlue
+                            series1.Label.TextColor = Color.White
+                            series1.Label.Font = miFuente
+                            series1.Label.TextPattern = "{V:F1}"
+
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Label.Font = miFuenteEjes
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacingAuto = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacing = 1
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Text = config.Tables(0).Rows(0)!texto_y
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Font = miFuenteAlto
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Tickmarks.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Tickmarks.MinorVisible = False
+
+                            CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Clear()
+
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.Font = miFuenteEjes
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Text = Strings.Space(5) & config.Tables(0).Rows(0)!texto_x & Strings.Space(10)
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Font = miFuenteAlto
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            If config.Tables(0).Rows(0)!overlap = "R" Then
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowStagger = False
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowRotate = True
+                            Else
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowStagger = True
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowRotate = False
+                            End If
+
+
+                            ChartControl1.Titles.Add(Titulo)
+                            Dim Titulo2 As New ChartTitle()
+
+                            Titulo2.Font = miFuente
+                            Titulo2.Text = "Extraccion de datos: " & cadPeriodo
+                            ChartControl1.Titles.Add(Titulo2)
+                            Dim Titulo3 As New ChartTitle()
+                            Titulo3.Font = miFuente
+                            Titulo3.Text = "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss")
+                            ChartControl1.Titles.Add(Titulo3)
+                            Dim Titulo4 As New ChartTitle()
+                            Titulo4.Font = miFuente
+                            Titulo4.Text = "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " &
+                                    Format(eHasta, "dd-MM-yyyy HH:mm:ss")
+                            ChartControl1.Titles.Add(Titulo4)
+                            ChartControl1.Width = 1000
+                            ChartControl1.Height = 700
+
+                            If config.Tables(0).Rows(0)!ver_leyenda = "S" Then
+                                ChartControl1.Legend.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            Else
+                                ChartControl1.Legend.Visibility = DevExpress.Utils.DefaultBoolean.False
+                            End If
+                            Try
+                                Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(archivoImagen, "\", "\\")
+                                SaveChartImageToFile(ChartControl1, ImageFormat.Png, rutaImagen)
+                                Dim image As Image = GetChartImage(ChartControl1, ImageFormat.Png)
+                                image.Save(rutaImagen)
+
+                            Catch ex As Exception
+                                agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " & ex.Message, 7, 0)
+                            End Try
+                        ElseIf idReporte >= 27 And idReporte <= 39 Then
+                            If idReporte >= 27 And idReporte <= 39 Then
+                                indicador01 = "REPORTES"
+                                indicador02 = "PCT"
+                            End If
+                            ChartControl1.Series.Clear()
+                            ChartControl1.Titles.Clear()
+                            Dim Titulo As New ChartTitle()
+                            Titulo.Text = config.Tables(0).Rows(0)!titulo & Strings.Space(10)
+                            Dim miFuente = New Drawing.Font("Lucida Sans", 10, FontStyle.Regular)
+                            Dim miFuenteAlto = New Drawing.Font("Lucida Sans", 16, FontStyle.Bold)
+                            Dim miFuenteEjes = New Drawing.Font("Lucida Sans", 11, FontStyle.Regular)
+
+                            Titulo.Font = miFuenteAlto
+                            Dim tabla_grafico As New DataTable("grafico")
+
+                            ' Create an empty table.
+                            Dim datos As New DataTable("grafico")
+                            Dim row As DataRow = Nothing
+                            datos.Columns.Add("orden", GetType(String))
+                            datos.Columns.Add("estacion", GetType(String))
+                            datos.Columns.Add("total", GetType(Decimal))
+                            datos.Columns.Add("pct", GetType(Decimal))
+                            tabla_grafico.Columns.Add("orden", GetType(String))
+                            tabla_grafico.Columns.Add("estacion", GetType(String))
+                            tabla_grafico.Columns.Add("total", GetType(Decimal))
+                            tabla_grafico.Columns.Add("pct", GetType(Decimal))
+
+                            For Each lineas In graficos.Tables(0).Rows
+                                row = datos.NewRow()
+                                row("orden") = "A"
+                                row("estacion") = lineas!nombre
+                                row("total") = lineas!mttrc
+                                row("pct") = lineas!pct
+                                datos.Rows.Add(row)
+                            Next
+
+                            If config.Tables(0).Rows(0)!maximo_barras > 0 Or config.Tables(0).Rows(0)!maximo_barraspct > 0 Then
+                                Dim TotalVal = 0
+                                Dim tBarras = 0
+                                Dim valAcum = 0
+                                Dim varios = 0
+                                Dim valAgrupado = 0
+                                Dim pctAgrupado = 0
+                                For Each filas In datos.Rows
+                                    TotalVal = TotalVal + filas!total
+                                    tBarras = tBarras + 1
+                                Next
+                                If tBarras > config.Tables(0).Rows(0)!maximo_barras Or (config.Tables(0).Rows(0)!maximo_barraspct > 0 And config.Tables(0).Rows(0)!maximo_barraspct < 100) Then
+                                    Dim view As DataView = New DataView(datos)
+                                    Dim tmpTabla As New DataTable("grafico")
+                                    ' Create an empty table.
+                                    tmpTabla.Columns.Add("orden", GetType(String))
+                                    tmpTabla.Columns.Add("estacion", GetType(String))
+                                    tmpTabla.Columns.Add("total", GetType(Decimal))
+                                    tmpTabla.Columns.Add("pct", GetType(Decimal))
+
+
+                                    view.Sort = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+                                    Dim tabla_ordenada As DataTable = view.ToTable()
+                                    tBarras = 0
+                                    valAcum = 0
+                                    For Each filas In tabla_ordenada.Rows
+                                        valAcum = valAcum + filas!total
+                                        tBarras = tBarras + 1
+                                        If tBarras > config.Tables(0).Rows(0)!maximo_barras Or ((valAcum / TotalVal * 100) > config.Tables(0).Rows(0)!maximo_barraspct And config.Tables(0).Rows(0)!maximo_barraspct > 0) Then
+                                            valAgrupado = valAgrupado + filas!total
+                                            pctAgrupado = pctAgrupado + filas!pct
+                                            varios = varios + 1
+                                        Else
+                                            row = tmpTabla.NewRow()
+                                            row("orden") = "B"
+                                            row("estacion") = filas!estacion
+                                            row("total") = filas!total
+                                            row("pct") = filas!pct
+                                            tmpTabla.Rows.Add(row)
+                                        End If
+                                    Next
+                                    If valAgrupado > 0 And config.Tables(0).Rows(0)!agrupar = "S" Then
+                                        Dim cadAgrupado As String = ValNull(config.Tables(0).Rows(0)!agrupar_texto, "A")
+                                        If cadAgrupado.Length = 0 Then cadAgrupado = "AGRUPADO"
+                                        cadAgrupado = cadAgrupado & " (" & varios & ")"
+                                        row = tmpTabla.NewRow()
+                                        If config.Tables(0).Rows(0)!agrupar_posicion = "P" Then
+                                            row("orden") = "A"
+                                        ElseIf config.Tables(0).Rows(0)!agrupar_posicion = "F" Then
+                                            row("orden") = "Z"
+                                        End If
+                                        row("estacion") = cadAgrupado
+                                        row("total") = valAgrupado
+                                        row("pct") = valAgrupado
+                                        tmpTabla.Rows.Add(row)
+                                    End If
+                                    Dim view_o As DataView = New DataView(tmpTabla)
+                                    If config.Tables(0).Rows(0)!agrupar_posicion = "O" Then
+                                        view_o.Sort = IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+
+                                    Else
+                                        view_o.Sort = "orden ASC," & IIf(config.Tables(0).Rows(0)!orden_grafica = "M", " total DESC", IIf(config.Tables(0).Rows(0)!orden_grafica = "N", " total", "estacion"))
+                                    End If
+                                    tabla_grafico = view_o.ToTable()
+                                Else
+                                    tabla_grafico = datos
+                                End If
+                            Else
+                                tabla_grafico = datos
+                            End If
+                            Dim series1 As New Series(indicador01, ViewType.Bar)
+
+                            ChartControl1.Series.Add(series1)
+                            series1.DataSource = tabla_grafico
+                            series1.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
+                            series1.View.Color = Color.SkyBlue
+                            series1.ArgumentScaleType = ScaleType.Qualitative
+                            series1.ArgumentDataMember = "estacion"
+                            series1.ValueScaleType = ScaleType.Numerical
+                            series1.ValueDataMembers.AddRange(New String() {"total"})
+                            series1.Label.BackColor = Color.DarkBlue
+                            series1.Label.TextColor = Color.White
+                            series1.Label.Font = miFuente
+                            series1.Label.TextPattern = "{V:F1}"
+
+                            Dim series2 As New Series(indicador02, ViewType.Spline)
+
+                            ChartControl1.Series.Add(series2)
+                            series2.DataSource = tabla_grafico
+                            series2.LabelsVisibility = DevExpress.Utils.DefaultBoolean.True
+                            series2.View.Color = Color.Green
+                            series2.ArgumentScaleType = ScaleType.Qualitative
+                            series2.ArgumentDataMember = "estacion"
+                            series2.ValueScaleType = ScaleType.Numerical
+                            series2.ValueDataMembers.AddRange(New String() {"pct"})
+                            series2.Label.BackColor = Color.DarkBlue
+                            series2.Label.TextColor = Color.White
+                            series2.Label.Font = miFuente
+                            series2.Label.TextPattern = "{V:F1}"
+
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Label.Font = miFuenteEjes
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacingAuto = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridSpacing = 1
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Text = config.Tables(0).Rows(0)!texto_y
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Font = miFuenteAlto
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Tickmarks.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisY.Tickmarks.MinorVisible = False
+
+                            Dim myAxisY As New SecondaryAxisY("PCT")
+                            CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Clear()
+                            CType(ChartControl1.Diagram, XYDiagram).SecondaryAxesY.Add(myAxisY)
+                            CType(series2.View, LineSeriesView).AxisY = myAxisY
+                            myAxisY.Title.Text = config.Tables(0).Rows(0)!texto_z
+                            myAxisY.Title.Visible = True
+                            myAxisY.Label.Font = miFuenteEjes
+                            myAxisY.Title.Font = miFuenteAlto
+                            myAxisY.GridLines.Visible = False
+                            myAxisY.Tickmarks.Visible = False
+                            myAxisY.Tickmarks.MinorVisible = False
+                            myAxisY.Title.TextColor = Color.Green
+                            myAxisY.Label.TextColor = Color.Green
+                            myAxisY.Color = Color.Green
+
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.Font = miFuenteEjes
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Text = Strings.Space(5) & config.Tables(0).Rows(0)!texto_x & Strings.Space(10)
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.GridLines.Visible = False
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Font = miFuenteAlto
+                            CType(ChartControl1.Diagram, XYDiagram).AxisX.Title.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            If config.Tables(0).Rows(0)!overlap = "R" Then
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowStagger = False
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowRotate = True
+                            Else
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowStagger = True
+                                CType(ChartControl1.Diagram, XYDiagram).AxisX.Label.ResolveOverlappingOptions.AllowRotate = False
+                            End If
+
+
+                            ChartControl1.Titles.Add(Titulo)
+                            Dim Titulo2 As New ChartTitle()
+
+                            Titulo2.Font = miFuente
+                            Titulo2.Text = "Extraccion de datos: " & cadPeriodo
+                            ChartControl1.Titles.Add(Titulo2)
+                            Dim Titulo3 As New ChartTitle()
+                            Titulo3.Font = miFuente
+                            Titulo3.Text = "Generado el: " & Format(Now, "ddd dd-MM-yyyy HH:mm:ss")
+                            ChartControl1.Titles.Add(Titulo3)
+                            Dim Titulo4 As New ChartTitle()
+                            Titulo4.Font = miFuente
+                            Titulo4.Text = "Extrayendo los datos desde: " & Format(eDesde, "dd-MM-yyyy HH:mm:ss") & " hasta: " &
+                                    Format(eHasta, "dd-MM-yyyy HH:mm:ss")
+                            ChartControl1.Titles.Add(Titulo4)
+                            ChartControl1.Width = 1000
+                            ChartControl1.Height = 700
+
+                            If config.Tables(0).Rows(0)!ver_leyenda = "S" Then
+                                ChartControl1.Legend.Visibility = DevExpress.Utils.DefaultBoolean.True
+                            Else
+                                ChartControl1.Legend.Visibility = DevExpress.Utils.DefaultBoolean.False
+                            End If
+                            Try
+                                Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(archivoImagen, "\", "\\")
+                                SaveChartImageToFile(ChartControl1, ImageFormat.Png, rutaImagen)
+                                Dim image As Image = GetChartImage(ChartControl1, ImageFormat.Png)
+                                image.Save(rutaImagen)
+
+                            Catch ex As Exception
+                                agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " & ex.Message, 7, 0)
+                            End Try
+                        End If
+                    End If
+
+                    'No hay datos, notificar
                 End If
-                cadSQL = "SELECT SUM(IF(vw_alarmas.tiempo > 0, 1, 0)) as tiempo, ROUND(SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) / (SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)) + SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0))) * 100, 0) as prom, SEC_TO_TIME(ROUND(SUM(vw_alarmas.tiempo) / SUM(IF(vw_alarmas.tiempo > 0, 1, 0)), 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos = 0, 1, 0)), SUM(IF(vw_alarmas.tiempo > 0 AND vw_reportes.escalamientos > 0, 1, 0)), SUM(IF(vw_alarmas.tiempo = 0, 1, 0)) FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.inicio >= '" & fDesde & "' AND vw_alarmas.inicio <= '" & fHasta & "'"
-                '''
-                reader = consultaSEL(cadSQL)
-                If errorBD.Length > 0 Then
-                    agregarLOG("Ocurrió un error al intentar leer MySQL. Error: " + Microsoft.VisualBasic.Strings.Left(errorBD, 250), 9, 0)
-                    errorCorreos = errorBD
-                    generarReporte5 = -1
-                Else
-                    circular = GaugeControl1.Gauges(GaugeControl1.Gauges.Count - 1)
-                    circular.BeginUpdate()
-
-                    circular.Scales(0).Ranges(0).EndValue = bajo_hasta
-                    circular.Scales(0).Ranges(1).StartValue = bajo_hasta
-                    circular.Scales(0).Ranges(1).EndValue = medio_hasta
-                    circular.Scales(0).Ranges(2).StartValue = medio_hasta
-                    circular.Scales(0).Ranges(0).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(bajo_color))
-                    circular.Scales(0).Ranges(1).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(medio_color))
-                    circular.Scales(0).Ranges(2).AppearanceRange.ContentBrush = New SolidBrushObject(ColorTranslator.FromHtml(alto_color))
-
-                    Dim promedio = ValNull(reader.Tables(0).Rows(0)!prom, "N")
-
-                    Dim label As LabelComponent = New LabelComponent("myLabel")
-                    label.AppearanceText.TextBrush = New SolidBrushObject(Color.Black)
-                    label.Position = New PointF2D(125, 250)
-                    label.Size = New Size(300, 300)
-                    label.ZOrder = -10000
-                    label.Text = cad_consolidado
-                    Dim label2 As LabelComponent = New LabelComponent("myLabel")
-                    label2.AppearanceText.TextBrush = New SolidBrushObject(Color.Black)
-                    label2.Position = New PointF2D(125, 270)
-                    label2.Size = New Size(300, 300)
-                    label2.ZOrder = -10000
-                    label2.Text = "Rendimiento: " & promedio & "%"
-                    circular.Scales(0).Labels.Add(label)
-                    circular.Scales(0).Labels.Add(label2)
-                    circular.Scales(0).Value = promedio
-                    circular.Scales(0).Labels(0).AppearanceText.Font = miFuente
-                    circular.Scales(0).Labels(1).AppearanceText.Font = miFuente
-                    circular.EndUpdate()
-                    '''
-                End If
-                GaugeControl1.Refresh()
-                GaugeControl1.Width = 1500
-                GaugeControl1.Height = 900
-                Try
-                    Dim rutaImagen = Microsoft.VisualBasic.Strings.Replace(archivoImagen, "\", "\\")
-                    SaveGaugeImageToFile(GaugeControl1, ImageFormat.Png, rutaImagen)
-                    Dim image As Image = GetGaugeImage(GaugeControl1, ImageFormat.Png)
-                    image.Save(rutaImagen)
-
-                Catch ex As Exception
-                    agregarLOG("Ocurrió un error al intentar construir un archivo de adjunto de reporte (gráfico). Error: " + ex.Message, 7, 0)
-                End Try
             End If
-        End If
-
-
-    End Function
-
-    Function generarReporte6(reporte As String, periodo As String, nperiodos As Integer, ruta As String) As Integer
-        generarReporte6 = 0
-        Dim archivoSaliente = ruta & "\estadistica_de_fallas.csv"
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte6 = -1
-                Exit Function
-            End Try
-        End If
-        archivoSaliente = archivoSaliente.Replace("\", "\\")
-
-        Dim eDesde = Now()
-        Dim eHasta = Now()
-        Dim ePeriodo = nperiodos
-        Dim diaSemana = DateAndTime.Weekday(Now)
-        Dim intervalo = DateInterval.Second
-        Dim cadPeriodo As String = nperiodos & " segundo(s) atras"
-        If periodo = 1 Then
-            intervalo = DateInterval.Minute
-            cadPeriodo = nperiodos & " minuto(s) atras"
-        ElseIf periodo = 2 Then
-            intervalo = DateInterval.Hour
-            cadPeriodo = nperiodos & " hora(s) atras"
-        ElseIf periodo = 3 Then
-            intervalo = DateInterval.Day
-            cadPeriodo = nperiodos & " día(s) atras"
-        ElseIf periodo = 4 Then
-            intervalo = DateInterval.Day
-            ePeriodo = 6
-            cadPeriodo = nperiodos & " semana(s) atras"
-        ElseIf periodo = 5 Then
-            intervalo = DateInterval.Month
-            cadPeriodo = nperiodos & " mes(es) atras"
-        ElseIf periodo = 6 Then
-            intervalo = DateInterval.Year
-            cadPeriodo = nperiodos & " año(s) atras"
-        ElseIf periodo = 10 Then
-            eDesde = CDate(Format(Now, "yyyy/MM/dd") & " 00:00:00")
-            cadPeriodo = "Lo que va del día de hoy"
-        ElseIf periodo = 11 Then
-            cadPeriodo = "Lo que va de la semana"
-            If diaSemana = 0 Then
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, -6, Now), "yyyy/MM/dd") & " 00:00:00")
-            Else
-                eDesde = CDate(Format(DateAdd(DateInterval.Day, (diaSemana - 2) * -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            End If
-        ElseIf periodo = 12 Then
-            cadPeriodo = "Lo que va del mes"
-            eDesde = CDate(Format(Now, "yyyy/MM") & "/01 00:00:00")
-        ElseIf periodo = 13 Then
-            cadPeriodo = "Lo que va del anyo"
-            eDesde = CDate(Format(Now, "yyyy") & "/01/01 00:00:00")
-        ElseIf periodo = 20 Then
-            cadPeriodo = "El día de ayer"
-            eDesde = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, Now), "yyyy/MM/dd") & " 23:59:59")
-        ElseIf periodo = 21 Then
-            cadPeriodo = "La semana pasada"
-            Dim dayDiff As Integer = Date.Today.DayOfWeek - DayOfWeek.Monday
-            eDesde = CDate(Format(Today.AddDays(-dayDiff), "yyyy/MM/dd") & " 00:00:00")
-            eDesde = DateAdd(DateInterval.Day, -7, CDate(eDesde))
-            eHasta = DateAdd(DateInterval.Day, 6, CDate(eDesde))
-        ElseIf periodo = 22 Then
-            cadPeriodo = "El mes pasado"
-            eDesde = CDate(Format(DateAdd(DateInterval.Month, -1, Now), "yyyy/MM") & "/01 00:00:00")
-            eHasta = CDate(Format(DateAdd(DateInterval.Day, -1, CDate(Format(Now, "yyyy/MM") & "/01")), "yyyy/MM/dd") & " 23:59:59")
-        End If
-        If periodo < 10 Then eDesde = DateAdd(intervalo, ePeriodo * -1, eDesde)
-        Dim fDesde = Format(eDesde, "yyyy/MM/dd HH:mm:ss")
-        Dim fHasta = Format(eHasta, "yyyy/MM/dd HH:mm:ss")
-
-        Dim comillas = Microsoft.VisualBasic.Strings.Left(Chr(34), 1)
-        Dim regsAfectados = consultaACT("USE sigma;SELECT 'Reporte de estadistica de fallas (" & cadPeriodo & ")','','','','','','','','','','','' UNION ALL SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','','','','','','','','','' UNION ALL SELECT CONCAT('Extayendo datos desde: ', '" & Format(eDesde, "dd/MMM/yyyy HH:mm:ss") & "', ' hasta: ', '" & Format(eHasta, "dd/MMM/yyyy HH:mm:ss") & "'),'','','','','','','','','','','' UNION ALL SELECT 'Desde','Hasta','Nave','Estacion','Responsable','Tecnología','Falla','Fallas generadas en el lapso','Fallas cerradas en el lapso','Cerradas con escalamiento',' Cerradas en tiempo','Abiertas' UNION ALL SELECT desde, hasta, nave,estacion, responsable, tecnologia, codigo, fallas_generadas, fallas_cerradas, fallas_escaladas, fallas_entiempo, fallas_total FROM sigma.vw_resumen WHERE desde >= '" + fDesde + "' AND desde <= '" + fHasta + "' UNION ALL
-SELECT '', '', '', '', '', '', 'Total resumen', SUM(fallas_generadas), SUM(fallas_cerradas), SUM(fallas_escaladas), SUM(fallas_entiempo), SUM(fallas_total) FROM vw_resumen WHERE desde >= '" + fDesde + "' AND desde <= '" + fHasta + "' INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
-        If errorBD.Length > 0 Then
-            errorCorreos = errorBD
-            agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-            generarReporte6 = -1
-        End If
-
-
-    End Function
-
-
-    Function generarReporte7(ruta As String) As Integer
-        generarReporte7 = 0
-        Dim archivoSaliente = ruta & "\fallas_abiertas.csv"
-        If My.Computer.FileSystem.FileExists(archivoSaliente) Then
-            Try
-                My.Computer.FileSystem.DeleteFile(archivoSaliente)
-            Catch ex As Exception
-                errorCorreos = ex.Message
-                agregarLOG("Error al construir el reporte. " + ex.Message, 7, 0)
-                generarReporte7 = -1
-                Exit Function
-            End Try
-        End If
-        archivoSaliente = archivoSaliente.Replace("\", "\\")
-
-        Dim comillas = Microsoft.VisualBasic.Strings.Left(Chr(34), 1)
-        Dim regsAfectados = consultaACT("USE sigma;SELECT 'Reporte de fallas al momento','','','','','','','','','','','','','','','','','' UNION ALL SELECT CONCAT('Reporte generado en fecha: ', NOW()),'','','','','','','','','','','','','','','','','' UNION ALL SELECT 'ID','Codigo','Descripcion','Estacion','Responsable','Tecnología','Nave','Prioridad','Fecha de inicio','Tiempo transcurrido en segundos','Tiempo HH:MM:SS','Repeticiones','Nivel de escalamiento','Fecha de escalamiento (1)','Fecha de escalamiento (2)','Fecha de escalamiento (3)','Fecha de escalamiento (4)','Fecha de escalamiento (5)' UNION ALL SELECT vw_alarmas.falla, vw_alarmas.codigo, vw_alarmas.descripcion, vw_alarmas.estacion, vw_alarmas.responsable, vw_alarmas.tecnologia, vw_alarmas.nave, vw_alarmas.prioridad, vw_alarmas.inicio, TIME_TO_SEC(TIMEDIFF(NOW(), vw_alarmas.inicio)), SEC_TO_TIME(TIME_TO_SEC(TIMEDIFF(NOW(), vw_alarmas.inicio))), IFNULL(vw_reportes.repeticiones, 0) AS repeticiones, IFNULL(vw_reportes.escalamientos, 0) AS escalamientos, IFNULL(vw_reportes.escalada1, ''), IFNULL(vw_reportes.escalada2, ''), IFNULL(vw_reportes.escalada3, ''), IFNULL(vw_reportes.escalada4, ''), IFNULL(vw_reportes.escalada5, '') FROM sigma.alarmas LEFT JOIN sigma.vw_reportes ON vw_alarmas.reporte = vw_reportes.id WHERE vw_alarmas.tiempo = 0 UNION ALL
-SELECT CONCAT('Total fallas abiertas al momento: ', COUNT(*)), '', '', '', '', '', '', '', '', '', '','', '', '', '', '','','' FROM sigma.alarmas WHERE vw_alarmas.tiempo = 0 INTO OUTFILE '" & archivoSaliente & "' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '" & comillas & "' ENCLOSED BY '" & comillas & "' LINES TERMINATED BY '\n'")
-
-        If errorBD.Length > 0 Then
-            errorCorreos = errorBD
-            agregarLOG("Error al construir el reporte. " + errorBD, 7, 0)
-            generarReporte7 = -1
         End If
 
     End Function
@@ -1554,17 +1202,12 @@ SELECT CONCAT('Total fallas abiertas al momento: ', COUNT(*)), '', '', '', '', '
         calcularPromedio = Format(Math.Floor(horas), "00") & ":" & Format(Math.Floor(minutos), "00")
     End Function
 
-    Private Sub agregarLOG(cadena As String, tipo As Integer, reporte As Integer, Optional aplicacion As Integer = 1)
-        'Se agrega a la base de datos
-        'tipo 1: Info
-        'tipo 2: Incongruencia en los datos (usuario)
-        'tipo 8: Error crítico de Base de datos infofallas
-        'tipo 9: Error crítico de Base de datos sigma
-        Dim regsAfectados = consultaACT("INSERT INTO sigma.log (aplicacion, tipo, reporte, texto) VALUES (40, " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
-        If aplicacion = 10 Then
-            regsAfectados = consultaACT("UPDATE sigma.configuracion SET flag_monitor = 'S'")
-        End If
-
+    Private Sub agregarLOG(cadena As String, Optional reporte As Integer = 0, Optional tipo As Integer = 0, Optional aplicacion As Integer = 80)
+        If Not be_log_activar Then Exit Sub
+        'tipo 0: Info
+        'tipo 2: Advertencia
+        'tipo 9: Error
+        Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
     End Sub
 
     Private Function GetChartImage(ByVal chart As ChartControl, ByVal format As ImageFormat) As Image
@@ -1607,5 +1250,8 @@ SELECT CONCAT('Total fallas abiertas al momento: ', COUNT(*)), '', '', '', '', '
         chart.ExportToImage(fileName, format)
     End Sub
 
+    Private Sub Label1_Click(sender As Object, e As EventArgs) Handles Label1.Click
+
+    End Sub
 End Class
 
