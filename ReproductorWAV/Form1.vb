@@ -16,7 +16,7 @@ Imports System.Security.Cryptography
 Public Class Form1
 
 
-    Dim Ruta As String = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+    Dim Ruta As String = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
     Dim Segundos As Integer = 10
     Dim Cargando As Boolean = False
     Dim audios_externos As Boolean = False
@@ -34,19 +34,47 @@ Public Class Form1
         LinkLabel1.Top = 85
 
 
+
         Dim argumentos As String() = Environment.GetCommandLineArgs()
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
+            XtraMessageBox.Show("SIGMA Monitor ya se está ejecutando en este equipo", "Sesión iniciada", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Application.Exit()
-        ElseIf argumentos.Length <= 1 Then
-            MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
-            Application.Exit()
+            'ElseIf argumentos.Length <= 1 Then
+            '    XtraMessageBox.Show("No se puede iniciar el monitor: Se requiere la cadena de conexión", "Sesión iniciada", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            '    Application.Exit()
         Else
-            'cadenaConexion = argumentos(1)
-            cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
-            Dim idProceso = Process.GetCurrentProcess.Id
-
             idProceso = Process.GetCurrentProcess.Id
+            If argumentos.Length > 1 Then
+                cadenaConexion = argumentos(1).ToUpper
+            End If
+            If cadenaConexion = "" Then
+                cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+            Else
+                Dim baseCadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+                Dim arreParametros = baseCadenaConexion.Split(New Char() {";"c})
+                Dim arreConexion = cadenaConexion.Split(New Char() {";"c})
+
+                If arreConexion.Length > 0 Then
+                    cadenaConexion = ""
+                    For i = LBound(arreParametros) To UBound(arreParametros)
+                        Dim variablesValores1 = arreParametros(i).Split(New Char() {"="c})
+                        Dim encontrado As Integer = -1
+                        For j = LBound(arreConexion) To UBound(arreConexion)
+                            Dim variablesValores2 = arreConexion(j).Split(New Char() {"="c})
+                            If variablesValores1(0).ToUpper = variablesValores2(0).ToUpper Then
+                                encontrado = j
+                                Exit For
+                            End If
+                        Next
+                        If encontrado = -1 Then
+                            cadenaConexion = cadenaConexion & arreParametros(i).ToLower & ";"
+                        Else
+                            cadenaConexion = cadenaConexion & arreConexion(encontrado).ToLower & ";"
+                        End If
+                    Next
+                End If
+            End If
             estadoPrograma = True
 
             Dim regsAfectados = 0
@@ -65,7 +93,7 @@ Public Class Form1
             If audios_externos Then
                 Me.Text = "Modo audios externos"
                 If audios_externos_carpeta.Length = 0 Then
-                    audios_externos_carpeta = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                    audios_externos_carpeta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 Else
                     audios_externos_carpeta = Strings.Replace(audios_externos_carpeta, "/", "\")
                 End If
@@ -74,14 +102,14 @@ Public Class Form1
                     Try
                         My.Computer.FileSystem.CreateDirectory(audios_externos_carpeta)
                     Catch ex As Exception
-                        audios_externos_carpeta = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                        audios_externos_carpeta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     End Try
                 End If
             Else
                 Me.Text = "Modo generación de audios"
                 Try
 
-                    Dim miReader As StreamReader = My.Computer.FileSystem.OpenTextFileReader(My.Computer.FileSystem.SpecialDirectories.MyDocuments & "\rutadeaudo.txt")
+                    Dim miReader As StreamReader = My.Computer.FileSystem.OpenTextFileReader(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) & "\rutadeaudo.txt")
                     Dim elMensaje As String = miReader.ReadLine
                     Dim MICadena() As String = Split(elMensaje, ",")
                     Ruta = MICadena(0)
@@ -93,9 +121,9 @@ Public Class Form1
                 End Try
 
                 If Ruta.Trim.Length = 0 Or Not My.Computer.FileSystem.DirectoryExists(Ruta) Then
-                    Ruta = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                    Ruta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     Dim file As System.IO.StreamWriter
-                    file = My.Computer.FileSystem.OpenTextFileWriter(My.Computer.FileSystem.SpecialDirectories.MyDocuments & "\rutadeaudo.txt", True)
+                    file = My.Computer.FileSystem.OpenTextFileWriter(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) & "\rutadeaudo.txt", True)
                     file.WriteLine(Ruta & "," & Segundos)
                     file.Close()
                 End If
@@ -106,6 +134,9 @@ Public Class Form1
             TextEdit3.Text = Segundos
             Timer1.Interval = Segundos * 1000
             Timer1.Enabled = True
+            LabelControl1.Text = Timer1.Interval
+            TextEdit1.Text = "Carpeta: " & audios_externos_carpeta
+            TextEdit1.Visible = audios_externos
         End If
     End Sub
 
@@ -147,10 +178,10 @@ Public Class Form1
 
     Private Sub SimpleButton1_Click(sender As Object, e As EventArgs) Handles SimpleButton1.Click
         If TextEdit16.Text.Trim.Length = 0 Then
-            TextEdit16.Text = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+            TextEdit16.Text = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         End If
         If Not My.Computer.FileSystem.DirectoryExists(TextEdit16.Text) Then
-            TextEdit16.Text = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+            TextEdit16.Text = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         End If
         If Val(TextEdit3.Text.Trim) = 0 Then
             TextEdit3.Text = 10
@@ -159,22 +190,23 @@ Public Class Form1
         Segundos = Val(TextEdit3.Text)
 
         If Ruta.Trim.Length = 0 Then
-            Ruta = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+            Ruta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
 
         End If
 
         Try
 
-            Dim objWriter As New System.IO.StreamWriter(My.Computer.FileSystem.SpecialDirectories.MyDocuments & "\rutadeaudo.txt", False)
+            Dim objWriter As New System.IO.StreamWriter(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) & "\rutadeaudo.txt", False)
             objWriter.WriteLine(Ruta & "," & Segundos)
             objWriter.Close()
-            
+
         Catch ex As Exception
 
         End Try
         Timer1.Interval = Segundos * 1000
         Timer1.Enabled = False
         Timer1.Enabled = True
+        LabelControl1.Text = Timer1.Interval
         Me.Visible = False
     End Sub
 
@@ -199,7 +231,7 @@ Public Class Form1
                 For Each elmensaje In mensajesDS.Tables(0).Rows
                     'Se busca el prefijo
                     Try
-                        Dim vecesAudio = ValNull(elmensaje!areareproducir_audio_externo, "N")
+                        Dim vecesAudio = ValNull(elmensaje!reproducir_audio_externo, "N")
                         If vecesAudio = 0 Then vecesAudio = 1
                         For i = 1 To vecesAudio
                             audioFile = audios_externos_carpeta & "\p" & elmensaje!area & ".wav"
@@ -305,7 +337,7 @@ Public Class Form1
                 If My.Computer.FileSystem.DirectoryExists(TextEdit16.Text) Then
                     LaRuta = TextEdit16.Text
                 Else
-                    LaRuta = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                    LaRuta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 End If
             Catch ex As Exception
                 Cargando = False

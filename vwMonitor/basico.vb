@@ -12,17 +12,19 @@ Module basico
     Public autenticado As Boolean
     Public usuarioCerrar As String
     Public cadenaConexion As String
-    Public rutaBD As String = "sigmafm"
+    Public cadenaConexionMMCALL As String
+    Public rutaBD As String = "sigma"
+    Public rutaMMCALL As String = "mmcall"
     Public miTurno As Long
 
 
-    Public Function conexion() As MySqlConnection
+    Public Function conexion(miCadenaConexion As String) As MySqlConnection
         conexion = Nothing
         errorBD = ""
         Try
             conexion = New MySqlConnection
 
-            conexion.ConnectionString = cadenaConexion
+            conexion.ConnectionString = miCadenaConexion
             conexion.Open()
         Catch ex As Exception
             errorBD = ex.Message
@@ -46,7 +48,9 @@ Module basico
 
             Catch ex As Exception
                 errorBD = ex.Message
+                consultaACT = -1
             End Try
+
         End If
         miConexion.Dispose()
         miConexion.Close()
@@ -54,13 +58,15 @@ Module basico
 
     End Function
 
-    Public Function consultaSEL(cadena As String) As DataSet
+    Public Function consultaSEL(cadena As String, Optional miCadenaConexion As String = "") As DataSet
         Dim miConexion = New MySqlConnection
 
         Try
             errorBD = ""
-
-            miConexion.ConnectionString = cadenaConexion
+            If miCadenaConexion = "" Then
+                miCadenaConexion = cadenaConexion
+            End If
+            miConexion.ConnectionString = miCadenaConexion
 
             miConexion.Open()
 

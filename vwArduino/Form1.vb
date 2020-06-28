@@ -108,21 +108,21 @@ Public Class Form1
             contador = contador + 1
             TextBox1.Text = contador & ") Activado una llamada/SMS" & vbCrLf & TextBox1.Text
             If rutaSMS.Length = 0 Then
-                rutaSMS = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             Else
                 rutaSMS = Strings.Replace(rutaSMS, "/", "\")
             End If
             If Not My.Computer.FileSystem.DirectoryExists(rutaSMS) Then
-                rutaSMS = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             End If
 
             If rutaAudios.Length = 0 Then
-                rutaAudios = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaAudios = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             Else
                 rutaAudios = Strings.Replace(rutaAudios, "/", "\")
             End If
             If Not My.Computer.FileSystem.DirectoryExists(rutaAudios) Then
-                rutaAudios = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaAudios = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             End If
             contador = contador + 1
             TextBox1.Text = contador & ") Ruta de audios: " & rutaAudios & vbCrLf & TextBox1.Text
@@ -154,7 +154,7 @@ Public Class Form1
             'Llamadas telefónicas
 
             If Not My.Computer.FileSystem.DirectoryExists(rutaAudios) Then
-                rutaAudios = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaAudios = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             End If
             Dim LlamadasPendientes = 0
             For Each FoundFile As String In My.Computer.FileSystem.GetFiles(

@@ -16,6 +16,7 @@ Module basico
     Public cadenaConexion As String
     Public serialMmcall As String
     Public rutaBD As String = "sigma"
+    Public rutaMMCALL As String = "mmcall"
 
 
     Sub Main(argumentos As String())

@@ -101,7 +101,7 @@ Module basico
             End If
             If vecesPR = 0 Then vecesPR = 1
             If rutaSMS.Length = 0 Then
-                rutaSMS = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             Else
                 rutaSMS = Strings.Replace(rutaSMS, "/", "\")
             End If
@@ -109,7 +109,7 @@ Module basico
                 Try
                     My.Computer.FileSystem.CreateDirectory(rutaSMS)
                 Catch ex As Exception
-                    rutaSMS = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                    rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 End Try
             End If
             If audios_prefijo.Length > 0 Then

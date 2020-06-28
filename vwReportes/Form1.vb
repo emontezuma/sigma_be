@@ -138,18 +138,18 @@ Public Class Form1
             If noatendio_color.Length = 0 Then noatendio_color = System.Drawing.Color.Tomato.ToString
 
             If rutaFiles.Length = 0 Then
-                rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                rutaFiles = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             Else
                 rutaFiles = Strings.Replace(rutaFiles, "/", "\")
                 If Not My.Computer.FileSystem.DirectoryExists(rutaFiles) Then
                     Try
                         My.Computer.FileSystem.CreateDirectory(rutaFiles)
                     Catch ex As Exception
-                        rutaFiles = My.Computer.FileSystem.SpecialDirectories.MyDocuments
+                        rutaFiles = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     End Try
                 End If
             End If
-            If rutaFiles <> My.Computer.FileSystem.SpecialDirectories.MyDocuments Then
+            If rutaFiles <> Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) Then
                 For Each foundFile As String In My.Computer.FileSystem.GetFiles(
   rutaFiles, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.png")
                     Try
