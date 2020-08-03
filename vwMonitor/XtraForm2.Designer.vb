@@ -19,7 +19,6 @@ Partial Class XtraForm2
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
-        Me.components = New System.ComponentModel.Container()
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(XtraForm2))
         Me.GroupControl1 = New DevExpress.XtraEditors.GroupControl()
         Me.TextEdit2 = New DevExpress.XtraEditors.TextEdit()
@@ -28,7 +27,7 @@ Partial Class XtraForm2
         Me.LabelControl4 = New DevExpress.XtraEditors.LabelControl()
         Me.SimpleButton1 = New DevExpress.XtraEditors.SimpleButton()
         Me.SimpleButton2 = New DevExpress.XtraEditors.SimpleButton()
-        Me.Timer1 = New System.Windows.Forms.Timer(Me.components)
+        Me.Timer1 = New System.Windows.Forms.Timer()
         Me.LabelControl2 = New DevExpress.XtraEditors.LabelControl()
         CType(Me.GroupControl1, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.GroupControl1.SuspendLayout()
@@ -136,7 +135,7 @@ Partial Class XtraForm2
         Me.AutoScaleDimensions = New System.Drawing.SizeF(7.0!, 15.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.SimpleButton2
-        Me.ClientSize = New System.Drawing.Size(360, 132)
+        Me.ClientSize = New System.Drawing.Size(356, 128)
         Me.ControlBox = False
         Me.Controls.Add(Me.LabelControl2)
         Me.Controls.Add(Me.SimpleButton2)

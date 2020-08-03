@@ -64,7 +64,7 @@ Public Class Form1
             MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
         Else
             cadenaConexion = argumentos(1)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
             Dim idProceso = Process.GetCurrentProcess.Id
 
             idProceso = Process.GetCurrentProcess.Id
@@ -84,10 +84,8 @@ Public Class Form1
         Dim cadSQL As String = "SELECT * FROM " & rutaBD & ".control WHERE fecha = '" & Format(Now, "yyyyMMddHH") & "'"
         Dim readerDS As DataSet = consultaSEL(cadSQL)
         If readerDS.Tables(0).Rows.Count > 0 Then
-            'Exit Sub
+            Exit Sub
         End If
-
-
         Dim regsAfectados = 0
         'Escalada 4
         Dim miError As String = ""
@@ -189,7 +187,6 @@ Public Class Form1
                 Dim enlazado = False
                 Dim errorCorreo = ""
                 Dim smtpServer As New SmtpClient()
-
                 Try
                     smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
                     smtpServer.Port = correo_puerto
@@ -200,7 +197,6 @@ Public Class Form1
                     errorCorreo = ex.Message
                 End Try
                 If enlazado Then
-
                     For Each elmensaje In mensajesDS.Tables(0).Rows
                         id01 = False
                         id02 = False
@@ -346,7 +342,7 @@ Public Class Form1
                                         tMensajes = tMensajes + 1
                                         mensajeGenerado = True
                                     Catch ex As Exception
-                                        Dim miEror = ex.Message
+                                        agregarLOG("Hubo un error en la conexión al servidor de correos. El error es: " & ex.Message, 0, 9)
                                     End Try
                                 Else
                                     mensajeGenerado = True

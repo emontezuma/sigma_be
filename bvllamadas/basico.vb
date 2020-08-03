@@ -32,7 +32,7 @@ Module basico
             MsgBox("No se puede la generación de archivos de voz: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
         Else
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
 
             Dim mensajesDS As DataSet
@@ -85,7 +85,6 @@ Module basico
                 rutaSMS = ValNull(reader!ruta_audios, "A")
                 voz_audio = ValNull(reader!voz_predeterminada, "A")
                 traducir = ValNull(reader!traducir, "A") = "S"
-                be_alarmas_llamadas = ValNull(reader!be_alarmas_llamadas, "A") = "S"
                 be_alarmas_llamadas = ValNull(reader!be_alarmas_llamadas, "A") = "S"
                 audios_activar = ValNull(reader!audios_activar, "A") = "S"
                 audios_ruta = ValNull(reader!audios_ruta, "A")
@@ -332,7 +331,6 @@ Module basico
                                             Else
                                                 synthesizer0.SetOutputToWaveFile(audioDEF)
                                             End If
-                                            synthesizer0.SetOutputToWaveFile(audioTMP)
                                             synthesizer0.SelectVoice(voz_audio)
                                             synthesizer0.Volume = 100 '
                                             synthesizer0.Rate = audio_rate '    

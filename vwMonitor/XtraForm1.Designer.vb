@@ -19,7 +19,6 @@ Partial Class XtraForm1
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
-        Me.components = New System.ComponentModel.Container()
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(XtraForm1))
         Me.PictureEdit1 = New DevExpress.XtraEditors.PictureEdit()
         Me.TileBar1 = New DevExpress.XtraBars.Navigation.TileBar()
@@ -32,22 +31,22 @@ Partial Class XtraForm1
         Me.SimpleButton1 = New DevExpress.XtraEditors.SimpleButton()
         Me.SimpleButton3 = New DevExpress.XtraEditors.SimpleButton()
         Me.SimpleButton2 = New DevExpress.XtraEditors.SimpleButton()
-        Me.revisaFlag = New System.Windows.Forms.Timer(Me.components)
-        Me.escalamiento = New System.Windows.Forms.Timer(Me.components)
-        Me.SerialPort1 = New System.IO.Ports.SerialPort(Me.components)
-        Me.NotifyIcon1 = New System.Windows.Forms.NotifyIcon(Me.components)
-        Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip(Me.components)
+        Me.revisaFlag = New System.Windows.Forms.Timer()
+        Me.escalamiento = New System.Windows.Forms.Timer()
+        Me.SerialPort1 = New System.IO.Ports.SerialPort()
+        Me.NotifyIcon1 = New System.Windows.Forms.NotifyIcon()
+        Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip()
         Me.VerElLogToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.DetenerElMonitorToolStripMenuItem = New System.Windows.Forms.ToolStripSeparator()
         Me.ToolStripMenuItem1 = New System.Windows.Forms.ToolStripMenuItem()
         Me.ReanudarElMonitorToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.ListBoxControl1 = New DevExpress.XtraEditors.ListBoxControl()
         Me.PictureEdit2 = New DevExpress.XtraEditors.PictureEdit()
-        Me.revisarLog = New System.Windows.Forms.Timer(Me.components)
-        Me.sinEventos = New System.Windows.Forms.Timer(Me.components)
+        Me.revisarLog = New System.Windows.Forms.Timer()
+        Me.sinEventos = New System.Windows.Forms.Timer()
         Me.BarStaticItem4 = New DevExpress.XtraBars.BarStaticItem()
         Me.BarDockControl1 = New DevExpress.XtraBars.BarDockControl()
-        Me.BarManager1 = New DevExpress.XtraBars.BarManager(Me.components)
+        Me.BarManager1 = New DevExpress.XtraBars.BarManager()
         Me.Bar3 = New DevExpress.XtraBars.Bar()
         Me.SkinBarSubItem1 = New DevExpress.XtraBars.SkinBarSubItem()
         Me.BarStaticItem3 = New DevExpress.XtraBars.BarStaticItem()
@@ -57,14 +56,14 @@ Partial Class XtraForm1
         Me.barDockControlLeft = New DevExpress.XtraBars.BarDockControl()
         Me.barDockControlRight = New DevExpress.XtraBars.BarDockControl()
         Me.BarStaticItem2 = New DevExpress.XtraBars.BarStaticItem()
-        Me.reportes = New System.Windows.Forms.Timer(Me.components)
-        Me.arduino = New System.Windows.Forms.Timer(Me.components)
-        Me.reenviarMMCALL = New System.Windows.Forms.Timer(Me.components)
-        Me.sensores = New System.Windows.Forms.Timer(Me.components)
-        Me.cambioTurno = New System.Windows.Forms.Timer(Me.components)
-        Me.cincoBotones = New System.Windows.Forms.Timer(Me.components)
-        Me.tmpPrueba = New System.Windows.Forms.Timer(Me.components)
-        Me.checklist = New System.Windows.Forms.Timer(Me.components)
+        Me.reportes = New System.Windows.Forms.Timer()
+        Me.arduino = New System.Windows.Forms.Timer()
+        Me.reenviarMMCALL = New System.Windows.Forms.Timer()
+        Me.sensores = New System.Windows.Forms.Timer()
+        Me.cambioTurno = New System.Windows.Forms.Timer()
+        Me.cincoBotones = New System.Windows.Forms.Timer()
+        Me.tmpPrueba = New System.Windows.Forms.Timer()
+        Me.checklist = New System.Windows.Forms.Timer()
         Me.TextEdit1 = New DevExpress.XtraEditors.TextEdit()
         CType(Me.PictureEdit1.Properties, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.GroupControl1, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -129,9 +128,9 @@ Partial Class XtraForm1
         Me.LabelControl2.Location = New System.Drawing.Point(30, 18)
         Me.LabelControl2.Margin = New System.Windows.Forms.Padding(2, 3, 2, 3)
         Me.LabelControl2.Name = "LabelControl2"
-        Me.LabelControl2.Size = New System.Drawing.Size(150, 15)
+        Me.LabelControl2.Size = New System.Drawing.Size(146, 15)
         Me.LabelControl2.TabIndex = 9
-        Me.LabelControl2.Text = "Versión 1.20 (28Jun2020)"
+        Me.LabelControl2.Text = "Versión 1.30 (28Jul2020)"
         '
         'HyperlinkLabelControl1
         '
@@ -337,6 +336,7 @@ Partial Class XtraForm1
         Me.BarManager1.DockControls.Add(Me.barDockControlBottom)
         Me.BarManager1.DockControls.Add(Me.barDockControlLeft)
         Me.BarManager1.DockControls.Add(Me.barDockControlRight)
+        Me.BarManager1.DockWindowTabFont = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.BarManager1.Form = Me
         Me.BarManager1.Items.AddRange(New DevExpress.XtraBars.BarItem() {Me.BarStaticItem1, Me.BarStaticItem3, Me.SkinBarSubItem1})
         Me.BarManager1.MaxItemId = 7
@@ -444,7 +444,6 @@ Partial Class XtraForm1
         '
         'cincoBotones
         '
-        Me.cincoBotones.Enabled = True
         Me.cincoBotones.Interval = 1000
         '
         'tmpPrueba
@@ -458,11 +457,11 @@ Partial Class XtraForm1
         '
         'TextEdit1
         '
-        Me.TextEdit1.Location = New System.Drawing.Point(11, 400)
+        Me.TextEdit1.Location = New System.Drawing.Point(10, 400)
         Me.TextEdit1.Margin = New System.Windows.Forms.Padding(2, 3, 2, 3)
         Me.TextEdit1.Name = "TextEdit1"
         Me.TextEdit1.Properties.ReadOnly = True
-        Me.TextEdit1.Size = New System.Drawing.Size(389, 22)
+        Me.TextEdit1.Size = New System.Drawing.Size(388, 22)
         Me.TextEdit1.TabIndex = 42
         '
         'XtraForm1

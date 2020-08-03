@@ -49,9 +49,9 @@ Public Class Form1
                 cadenaConexion = argumentos(1).ToUpper
             End If
             If cadenaConexion = "" Then
-                cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+                cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
             Else
-                Dim baseCadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+                Dim baseCadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
                 Dim arreParametros = baseCadenaConexion.Split(New Char() {";"c})
                 Dim arreConexion = cadenaConexion.Split(New Char() {";"c})
 

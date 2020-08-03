@@ -26,7 +26,7 @@ Module basico
         Else
 
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
             Dim mensajesDS As DataSet
             Dim registroDS As DataSet
@@ -183,6 +183,7 @@ Module basico
                                     'If mensajeGenerado Then
                                     'audiosGen = audiosGen + 1
                                     'Else
+
                                     'audiosNGen = audiosNGen + 1
                                     'agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & respuestaWS, nroReporte, 9)
                                     'End If
@@ -356,7 +357,7 @@ Module basico
     End Function
 
     'Function cadenaConexion() As String
-    'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+    'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
     'cadenaConexion = "server=10.241.241.30;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
 
     'End Function
@@ -513,7 +514,7 @@ Module basico
         Else
 
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
             Dim mensajesDS As DataSet
             Dim registroDS As DataSet

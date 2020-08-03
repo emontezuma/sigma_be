@@ -38,7 +38,7 @@ Public Class Form1
             contador = contador + 1
             TextBox1.Text = contador & ") Se inicia la interfaz telefónica con la cadena de conexión " & cadenaConexion & vbCrLf & TextBox1.Text
 
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
 
             idProceso = Process.GetCurrentProcess.Id

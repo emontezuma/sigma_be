@@ -24,7 +24,7 @@ Module basico
             MsgBox("No se puede iniciar la escritura en el LOG: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
         Else
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
             Dim mensajesDS As DataSet
             Dim eMensaje = ""
@@ -196,7 +196,7 @@ Module basico
     End Function
 
     'Function cadenaConexion() As String
-    '   cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+    '   cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
     'cadenaConexion = "server=10.241.241.30;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
 
     'End Function

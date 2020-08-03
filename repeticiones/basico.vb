@@ -27,7 +27,7 @@ Module basico
         Else
 
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
             Dim laLinea As String = ""
             Dim laMaquina As String = ""
@@ -337,7 +337,7 @@ Module basico
     End Function
 
     'Function cadenaConexion() As String
-    'cadenaConexion = "server=localhost;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+    'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
     'cadenaConexion = "server=10.241.241.30;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
 
     'End Function
