@@ -16,15 +16,16 @@ Module basico
     Public cadenaConexion As String
     Public serialMmcall As String
     Public rutaBD As String = "sigma"
+    Public traduccion As String()
+    Public be_idioma
 
 
     Sub Main(argumentos As String())
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede iniciar el envío de mensajes a MMCall: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
-
             cadenaConexion = argumentos(0)
             'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
@@ -60,10 +61,13 @@ Module basico
                 serialMmcall = ValNull(reader2.Tables(0).Rows(0)!mmcall, "A")
             End If
 
-            Dim cadSQL As String = "SELECT pagers_val, optimizar_mmcall, be_alarmas_mmcall, mantener_prioridad, maximo_largo_mmcall, be_log_activar FROM " & rutaBD & ".configuracion"
+            Dim cadSQL As String = "SELECT idioma_defecto, pagers_val, optimizar_mmcall, be_alarmas_mmcall, mantener_prioridad, maximo_largo_mmcall, be_log_activar FROM " & rutaBD & ".configuracion"
             Dim readerDS As DataSet = consultaSEL(cadSQL)
             If readerDS.Tables(0).Rows.Count > 0 Then
                 Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+                be_idioma = ValNull(reader!idioma_defecto, "N")
+                etiquetas()
+
                 optimizar = ValNull(reader!optimizar_mmcall, "A") = "S"
                 mantenerPrioridad = ValNull(reader!mantener_prioridad, "A") = "S"
                 maximo_largo_mmcall = ValNull(reader!maximo_largo_mmcall, "N")
@@ -74,7 +78,7 @@ Module basico
 
             If be_alarmas_mmcall Then
 
-                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 3 AND estatus = 'E'")
+                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 3 AND estatus = 'E' AND alerta <> -1000")
                 Dim agrupado As Boolean = True
                 If Not optimizar Then
                     cadSQL = "SELECT a.id, d.mmcall, a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
@@ -93,9 +97,9 @@ Module basico
                         canales = ValNull(elmensaje!mmcall, "A")
                         eMensaje = ""
                         If elmensaje!cuenta > 1 Then
-                            eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
+                            eMensaje = traduccion(0).Replace("campo_0", elmensaje!cuenta)
                             If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
+                                eMensaje = traduccion(1).Replace("campo_0", elmensaje!cuenta)
                             End If
                         ElseIf agrupado Then
                             cadSQL = "SELECT * FROM " & rutaBD & ".mensajes_procesados WHERE mensaje = " & elmensaje!id
@@ -144,58 +148,53 @@ Module basico
                                 If mmcalls(i).Length > 0 Then
                                     'Se valida el reloj
                                     Dim posReloj = Strings.InStr(mmcalls(i), "number=")
-                                    Dim iReloj = Strings.Mid(mmcalls(i), posReloj + 7)
+                                    Dim posiciones = 7
+                                    Dim esNumero = True
+                                    If posReloj = 0 Then
+                                        posReloj = Strings.InStr(mmcalls(i), "division=")
+                                        posiciones = 9
+                                        esNumero = False
+                                    End If
+                                    Dim iReloj = ""
+
+                                    If posReloj > 0 Then
+                                        iReloj = Strings.Mid(mmcalls(i), posReloj + posiciones)
+                                    End If
+
                                     If iReloj.Length = 0 Then
                                         If IsNumeric(mmcalls(i)) Then
                                             iReloj = mmcalls(i)
                                         Else
-                                            iReloj = "-1"
+                                            If IsNumeric(Strings.Mid(mmcalls(i), 2)) Then
+                                                iReloj = mmcalls(i)
+                                            Else
+                                                iReloj = "-1"
+                                            End If
                                         End If
                                     End If
                                     If iReloj <> "-1" Then
-                                        If Not valReloj(iReloj) And validar_reloj Then
-                                            agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
-                                            Continue For
+                                        If UCase(Strings.Left(iReloj, 1)) = "D" Then
+                                            iReloj = Val(Strings.Mid(iReloj, 2)) + 180
+                                        ElseIf UCase(Strings.Left(iReloj, 1)) = "A" Then
+                                            iReloj = 0
+                                        ElseIf Not esNumero Then
+                                            iReloj = Val(iReloj) + 180
                                         Else
+                                            iReloj = Val(iReloj) + 100
+                                        End If
+                                        If Not valReloj(iReloj) And validar_reloj Then
+                                            agregarLOG(traduccion(2) & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
+                                            Continue For
+                                        ElseIf IsNumeric(iReloj) Then
                                             If cadMMCALL = "" Then
                                                 cadMMCALL = "INSERT INTO mmcall.tasks (location_id, task, message, recipients, status, created) VALUES "
                                             Else
                                                 cadMMCALL = cadMMCALL + ","
                                             End If
-                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & (iReloj + 100) & "', 0, NOW())"
+                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
 
                                         End If
                                     End If
-                                    'respuestaWS = ""
-
-                                    'Try
-                                    'If validarURI(mmcalls(i) & "&message=" & eMensaje) Then
-                                    'Dim fr As System.Net.HttpWebRequest
-                                    'Dim targetURI As New Uri(mmcalls(i) & "&message=" & eMensaje)
-                                    '
-                                    'fr = DirectCast(HttpWebRequest.Create(targetURI), System.Net.HttpWebRequest)
-                                    'If (fr.GetResponse().ContentLength > 0) Then
-                                    'Dim str As New System.IO.StreamReader(fr.GetResponse().GetResponseStream())
-                                    'respuestaWS = str.ReadToEnd
-                                    'Str.Close()
-                                    'End If
-                                    'mensajeGenerado = respuestaWS = "success" And Not mensajeGenerado
-                                    'If mensajeGenerado Then
-                                    'audiosGen = audiosGen + 1
-                                    'Else
-
-                                    'audiosNGen = audiosNGen + 1
-                                    'agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & respuestaWS, nroReporte, 9)
-                                    'End If
-                                    'Else
-                                    'audiosNGen = audiosNGen + 1
-                                    'agregarLOG("" & mmcalls(i) & "&message=" & eMensaje & " error: la dirección no es válida", nroReporte, 9)
-                                    'End If
-                                    'Catch ex As System.Net.WebException
-                                    'agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & ex.Message,  , 9)
-                                    'audiosNGen = audiosNGen + 1
-                                    'miError = ex.Message
-                                    'End Try
                                 End If
                             Next
                         End If
@@ -215,9 +214,120 @@ Module basico
                         'End If
                     Next
                     If audiosGen > 0 Or audiosNGen > 0 Then
-                        agregarLOG("Se generaron " & audiosGen & " mensaje(s) a MMCall y no se generaron " & audiosNGen & " mensaje(s) a MMCall ")
+                        agregarLOG(traduccion(3).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
                     End If
                 End If
+
+                'Mensajes de Checklist
+                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 3 AND estatus = 'E' AND alerta = -1000")
+                cadSQL = "SELECT a.id, d.mmcall, 0, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' AND a.alerta = -1000 ORDER BY a.prioridad DESC, a.id"
+                mensajesDS = consultaSEL(cadSQL)
+                If mensajesDS.Tables(0).Rows.Count > 0 Then
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        canales = ValNull(elmensaje!mmcall, "A")
+                        eMensaje = ValNull(elmensaje!texto, "A")
+                        If eMensaje.Length > 0 And canales.Length > 0 Then
+                            Dim mmcalls As String()
+                            Dim tempArray As String()
+                            Dim totalItems = 0
+                            If canales.Length > 0 Then
+                                Dim arreCanales = canales.Split(New Char() {";"c})
+                                For i = LBound(arreCanales) To UBound(arreCanales)
+                                    'Redimensionamos el Array temporal y preservamos el valor  
+                                    ReDim Preserve mmcalls(totalItems + i)
+                                    mmcalls(totalItems + i) = arreCanales(i)
+                                Next
+                                tempArray = mmcalls
+                                totalItems = mmcalls.Length
+
+                                Dim x As Integer, y As Integer
+                                Dim z As Integer
+
+                                For x = 0 To UBound(mmcalls)
+                                    z = 0
+                                    For y = 0 To UBound(mmcalls) - 1
+                                        'Si el elemento del array es igual al array temporal  
+                                        If mmcalls(x) = tempArray(z) And y <> x Then
+                                            'Entonces Eliminamos el valor duplicado  
+                                            mmcalls(y) = ""
+                                        End If
+                                        z = z + 1
+                                    Next y
+                                Next x
+                                canales = ""
+                            End If
+                            If maximo_largo_mmcall = 0 Then maximo_largo_mmcall = 40
+                            eMensaje = Microsoft.VisualBasic.Strings.Left(eMensaje, maximo_largo_mmcall).Trim
+                            mensajeGenerado = False
+
+                            For i = 0 To UBound(mmcalls)
+                                If mmcalls(i).Length > 0 Then
+                                    'Se valida el reloj
+
+                                    Dim posReloj = Strings.InStr(mmcalls(i), "number=")
+                                    Dim posiciones = 7
+                                    Dim esNumero = True
+                                    If posReloj = 0 Then
+                                        posReloj = Strings.InStr(mmcalls(i), "division=")
+                                        posiciones = 9
+                                        esNumero = False
+                                    End If
+                                    Dim iReloj = ""
+
+                                    If posReloj > 0 Then
+                                        iReloj = Strings.Mid(mmcalls(i), posReloj + posiciones)
+                                    End If
+                                    If iReloj.Length = 0 Then
+                                        If IsNumeric(mmcalls(i)) Then
+                                            iReloj = mmcalls(i)
+                                        Else
+                                            If IsNumeric(Strings.Mid(mmcalls(i), 2)) Then
+                                                iReloj = mmcalls(i)
+                                            Else
+                                                iReloj = "-1"
+                                            End If
+                                        End If
+                                    End If
+                                    If iReloj <> "-1" Then
+                                        If UCase(Strings.Left(iReloj, 1)) = "D" Then
+                                            iReloj = Val(Strings.Mid(iReloj, 2)) + 180
+                                        ElseIf UCase(Strings.Left(iReloj, 1)) = "A" Then
+                                            iReloj = 0
+                                        ElseIf Not esNumero Then
+                                            iReloj = Val(iReloj) + 180
+                                        Else
+                                            iReloj = Val(iReloj) + 100
+                                        End If
+
+
+                                        If Not valReloj(iReloj) And validar_reloj Then
+                                            agregarLOG(traduccion(2) & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
+                                            Continue For
+                                        Else
+                                            If cadMMCALL = "" Then
+                                                cadMMCALL = "INSERT INTO mmcall.tasks (location_id, task, message, recipients, status, created) VALUES "
+                                            Else
+                                                cadMMCALL = cadMMCALL + ","
+                                            End If
+                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
+
+                                        End If
+                                    End If
+                                End If
+                            Next
+                        End If
+                        If cadMMCALL.Length > 0 Then cadMMCALL = cadMMCALL & ";"
+                        'If mensajeGenerado Then
+                        cadSQL = cadMMCALL & "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW()  WHERE id = " & elmensaje!id
+                        regsAfectados = consultaACT(cadSQL)
+                        cadMMCALL = ""
+                        'End If
+                    Next
+                    If audiosGen > 0 Or audiosNGen > 0 Then
+                        agregarLOG(traduccion(3).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
+                    End If
+                End If
+
             End If
         End If
         Application.Exit()
@@ -356,20 +466,14 @@ Module basico
         End Try
     End Function
 
-    'Function cadenaConexion() As String
-    'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-    'cadenaConexion = "server=10.241.241.30;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-
-    'End Function
-
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(4)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(5)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(6)
         End If
     End Function
 
@@ -505,380 +609,14 @@ Module basico
     End Function
 
 
-
-    Sub MainAntes(argumentos As String())
-        If Process.GetProcessesByName _
-          (Process.GetCurrentProcess.ProcessName).Length > 1 Then
-        ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede iniciar el envío de mensajes a MMCall: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
-        Else
-
-            cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-            Dim idProceso = Process.GetCurrentProcess.Id
-            Dim mensajesDS As DataSet
-            Dim registroDS As DataSet
-            Dim eMensaje = ""
-            Dim audiosGen = 0
-            Dim audiosNGen = 0
-            Dim respuestaWS As String = ""
-            Dim mensajeGenerado As Boolean
-            Dim canales As String = ""
-            Dim laLinea As String = ""
-            Dim laMaquina As String = ""
-            Dim laArea As String = ""
-            Dim laFalla As String = ""
-            Dim fecha
-            Dim tiempo As String = ""
-            Dim nroReporte As Integer = 0
-            Dim be_alarmas_mmcall As Boolean = False
-
-            'Escalada 4
-            Dim miError As String = ""
-            Dim optimizar As Boolean = False
-            Dim mantenerPrioridad As Boolean = False
-            Dim regsAfectados = 0
-
-            Dim maximo_largo_mmcall As Integer = 40
-
-            Dim cadSQL2 As String = "SELECT CONCAT(key_number, serial) AS mmcall FROM mmcall.locations"
-            Dim reader2 As DataSet = consultaSEL(cadSQL2)
-            If reader2.Tables(0).Rows.Count > 0 Then
-                serialMmcall = ValNull(reader2.Tables(0).Rows(0)!mmcall, "A")
-            End If
-
-            Dim cadSQL As String = "SELECT optimizar_mmcall, be_alarmas_mmcall, mantener_prioridad, maximo_largo_mmcall, be_log_activar FROM " & rutaBD & ".configuracion"
-            Dim readerDS As DataSet = consultaSEL(cadSQL)
-            If readerDS.Tables(0).Rows.Count > 0 Then
-                Dim reader As DataRow = readerDS.Tables(0).Rows(0)
-                optimizar = ValNull(reader!optimizar_mmcall, "A") = "S"
-                mantenerPrioridad = ValNull(reader!mantener_prioridad, "A") = "S"
-                maximo_largo_mmcall = ValNull(reader!maximo_largo_mmcall, "N")
-                be_alarmas_mmcall = ValNull(reader!be_alarmas_mmcall, "A") = "S"
-                be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
-            End If
-
-            If be_alarmas_mmcall Then
-
-                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 3 AND estatus = 'A'")
-
-                If Not optimizar Then
-                    cadSQL = "SELECT a.id, 1 AS cuenta, b.evento FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id WHERE a.canal = 3 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
-                ElseIf mantenerPrioridad Then
-                    cadSQL = "SELECT a.prioridad, a.lista, c.evento, b.mmcall, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.canal = 3 AND a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, c.evento, b.mmcall ORDER BY prioridad DESC"
-                Else
-                    cadSQL = "SELECT a.lista, c.evento, b.mmcall, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.canal = 3 AND a.estatus = '" & idProceso & "' GROUP BY a.lista, c.evento, b.mmcall, 4"
-                End If
-                'Se preselecciona la voz
-                mensajesDS = consultaSEL(cadSQL)
-                Dim generarMensaje As Boolean
-                If mensajesDS.Tables(0).Rows.Count > 0 Then
-                    For Each elmensaje In mensajesDS.Tables(0).Rows
-                        generarMensaje = False
-                        eMensaje = ""
-                        If elmensaje!cuenta > 1 Then
-                            eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                            If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                            End If
-                            canales = ValNull(elmensaje!mmcall, "A")
-                            laLinea = ""
-                            laMaquina = ""
-                            laArea = ""
-                            laFalla = ""
-                            tiempo = ""
-                            generarMensaje = True
-                            nroReporte = 0
-                        Else
-
-                            If elmensaje!evento < 200 Then
-                                cadSQL = "SELECT a.*, 0 AS rate, 0 AS oee, b.mmcall, e.nombre as nlinea, f.nombre as nmaquina, g.nombre as narea, h.nombre as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.acumular, c.mensaje_mmcall, c.resolucion_mensaje, c.cancelacion_mensaje, d.fecha, d.inicio_atencion, d.inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".reportes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_lineas e ON d.linea = e.id LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.maquina = f.id LEFT JOIN " & rutaBD & ".cat_areas g ON d.area = g.id LEFT JOIN " & rutaBD & ".cat_fallas h ON d.falla = h.id WHERE a.id = " & elmensaje!id
-                            ElseIf elmensaje!evento < 300 Then
-                                cadSQL = "SELECT a.*, IF(d.rate_teorico > 0, d.rate / d.rate_teorico * 100, 0) AS rate, d.oee, b.mmcall, e.nombre as nlinea, f.nombre as nmaquina, '' as narea, '' as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.acumular, c.mensaje_mmcal, d.rate_tendencia_baja AS fecha, d.rate_tendencia_alta AS inicio_atencion, d.parada_desde AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".relacion_maquinas_lecturas d ON a.proceso = d.equipo LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.equipo = f.id LEFT JOIN " & rutaBD & ".cat_lineas e ON f.linea = e.id WHERE a.id = " & elmensaje!id
-                            ElseIf elmensaje!evento = 301 Then
-                                cadSQL = "SELECT a.*, e1.referencia, e1.nombre AS producto, b1.numero AS nlote, IFNULL((SELECT MIN(orden) FROM " & rutaBD & ".prioridades WHERE parte = b1.parte AND fecha >= NOW() AND estatus = 'A'), 100) AS prioridad, d.ruta_secuencia, d.ruta_secuencia_antes, IFNULL(c1.nombre, 'N/A') AS ruta_antes, IFNULL(d1.nombre, 'N/A') AS ruta_despues, b.mmcall, c.id AS idalerta, c.evento AS tipoalerta, c.acumular, c.mensaje_mmcall, c.resolucion_mensaje, c.cancelacion_mensaje, i.inicio AS fecha, NOW() AS inicio_atencion, NOW() AS inicio_reporte, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes_historia d ON a.proceso = d.id INNER JOIN " & rutaBD & ".lotes b1 ON d.lote = b1.id LEFT JOIN " & rutaBD & ".det_rutas c1 ON d.ruta_detalle_anterior = c1.id LEFT JOIN " & rutaBD & ".det_rutas d1 ON d.ruta_detalle = d1.id LEFT JOIN " & rutaBD & ".cat_partes e1 ON b1.parte = e1.id WHERE a.id = " & elmensaje!id
-                            ElseIf elmensaje!evento = 302 Or elmensaje!evento = 303 Or elmensaje!evento = 305 Or elmensaje!evento = 306 Then
-                                cadSQL = "SELECT a.*, d.hasta, d.numero AS nlote, d.fecha, TIME_TO_SEC(TIMEDIFF(d.hasta, NOW())) AS previo, d.ruta_secuencia, c1.referencia, c1.nombre AS producto, IFNULL(b1.nombre, 'N/A') AS ruta_actual, IFNULL(e1.nombre, 'N/A') as equipo, IFNULL(d1.nombre, 'N/A') as nproceso, b.mmcall, c.id AS idalerta, c.evento AS tipoalerta, c.acumular, c.mensaje_mmcall, c.resolucion_mensaje, c.cancelacion_mensaje, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".det_rutas b1 ON d.ruta_detalle = b1.id LEFT JOIN " & rutaBD & ".cat_partes c1 ON d.parte = c1.id LEFT JOIN " & rutaBD & ".cat_procesos d1 ON d.proceso = d1.id LEFT JOIN " & rutaBD & ".cat_maquinas e1 ON d.equipo= e1.id WHERE a.id = " & elmensaje!id
-                            ElseIf elmensaje!evento = 304 Or elmensaje!evento = 307 Then
-                                cadSQL = "SELECT a.*, 0 AS previo, d.carga, d.alarma, d.alarma_rep, d.fecha, d.permitir_reprogramacion, d.equipo, d.fecha, IFNULL(b1.nombre, 'N/A') as nequipo, IFNULL(c1.nombre, 'N/A') as nproceso, IFNULL((SELECT SUM(cantidad) FROM " & rutaBD & ".programacion WHERE carga = d.id AND estatus = 'A'), 0) AS piezas, (SELECT COUNT(*) FROM " & rutaBD & ".lotes WHERE carga = d.id) AS avance, b.mmcall, c.id AS idalerta, c.evento AS tipoalerta, c.acumular, c.mensaje_mmcall, c.resolucion_mensaje, c.cancelacion_mensaje, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".cargas d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_maquinas b1 ON d.equipo = b1.id AND b1.estatus = 'A' LEFT JOIN " & rutaBD & ".cat_procesos c1 ON b1.proceso = c1.id AND c1.estatus = 'A' WHERE a.id = " & elmensaje!id
-                            End If
-
-                            registroDS = consultaSEL(cadSQL)
-                            If registroDS.Tables(0).Rows.Count > 0 Then
-                                nroReporte = registroDS.Tables(0).Rows(0)!proceso
-                                canales = ValNull(registroDS.Tables(0).Rows(0)!mmcall, "A")
-                                If canales.Length > 0 Then
-                                    generarMensaje = True
-
-
-                                    If registroDS.Tables(0).Rows(0)!tipoalerta < 300 Then
-                                        laLinea = ValNull(registroDS.Tables(0).Rows(0)!nlinea, "A")
-                                        laMaquina = ValNull(registroDS.Tables(0).Rows(0)!nmaquina, "A")
-                                        laArea = ValNull(registroDS.Tables(0).Rows(0)!narea, "A")
-                                        laFalla = ValNull(registroDS.Tables(0).Rows(0)!nfalla, "A")
-                                    Else
-                                        laLinea = ""
-                                        laMaquina = ""
-                                        laArea = ""
-                                        laFalla = ""
-                                    End If
-
-
-                                    If registroDS.Tables(0).Rows(0)!tipoalerta = 101 Or registroDS.Tables(0).Rows(0)!tipoalerta = 201 Or registroDS.Tables(0).Rows(0)!tipoalerta = 301 Then
-                                        fecha = registroDS.Tables(0).Rows(0)!fecha
-                                    ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 102 Or registroDS.Tables(0).Rows(0)!tipoalerta = 202 Or registroDS.Tables(0).Rows(0)!tipoalerta > 300 Then
-                                        fecha = registroDS.Tables(0).Rows(0)!inicio_atencion
-                                    ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 103 Or registroDS.Tables(0).Rows(0)!tipoalerta = 203 Then
-                                        fecha = registroDS.Tables(0).Rows(0)!inicio_reporte
-                                    End If
-                                    tiempo = calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, fecha, Now))
-                                    If registroDS.Tables(0).Rows(0)!tipo = 0 Then
-                                        eMensaje = ValNull(registroDS.Tables(0).Rows(0)!mensaje_mmcall, "A")
-                                    ElseIf registroDS.Tables(0).Rows(0)!tipo = 8 Then
-                                        eMensaje = ValNull(registroDS.Tables(0).Rows(0)!resolucion_mensaje, "A")
-                                    ElseIf registroDS.Tables(0).Rows(0)!tipo = 7 Then
-                                        eMensaje = ValNull(registroDS.Tables(0).Rows(0)!cancelacion_mensaje, "A")
-                                    End If
-
-                                    If eMensaje.Length > 0 Then
-                                        eMensaje = Replace(eMensaje, "[0]", nroReporte)
-                                        eMensaje = Replace(eMensaje, "[1]", laLinea)
-                                        eMensaje = Replace(eMensaje, "[2]", laMaquina)
-                                        eMensaje = Replace(eMensaje, "[3]", laArea)
-                                        eMensaje = Replace(eMensaje, "[4]", laFalla)
-                                        eMensaje = Replace(eMensaje, "[5]", Format(fecha, "dd/MM HH:mm"))
-                                        eMensaje = Replace(eMensaje, "[11]", tiempo)
-                                        If registroDS.Tables(0).Rows(0)!tipoalerta < 300 Then
-                                            eMensaje = Replace(eMensaje, "[12]", Format(registroDS.Tables(0).Rows(0)!rate, "0.0"))
-                                            eMensaje = Replace(eMensaje, "[13]", Format(registroDS.Tables(0).Rows(0)!oee, "0.0"))
-
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!repeticiones, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[20]", "R" & ValNull(registroDS.Tables(0).Rows(0)!repeticiones, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[20]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!fase - 10, "N") > 0 Then
-                                            Dim escala = ValNull(registroDS.Tables(0).Rows(0)!fase, "N") - 10
-                                            eMensaje = Replace(eMensaje, "[30]", "Escalado al Nivel " & If(escala > 0, escala, 0))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[30]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!escalamientos1, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[31]", "R" & ValNull(registroDS.Tables(0).Rows(0)!escalamientos1, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[31]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!escalamientos2, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[32]", "R" & ValNull(registroDS.Tables(0).Rows(0)!escalamientos2, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[32]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!escalamientos3, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[33]", "R" & ValNull(registroDS.Tables(0).Rows(0)!escalamientos3, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[33]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!escalamientos4, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[34]", "R" & ValNull(registroDS.Tables(0).Rows(0)!escalamientos4, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[34]", "")
-                                        End If
-                                        If ValNull(registroDS.Tables(0).Rows(0)!escalamientos5, "N") > 0 Then
-                                            eMensaje = Replace(eMensaje, "[35]", "R" & ValNull(registroDS.Tables(0).Rows(0)!escalamientos5, "N"))
-                                        Else
-                                            eMensaje = Replace(eMensaje, "[35]", "")
-                                        End If
-
-
-                                        If elmensaje!evento = 301 Then
-                                            eMensaje = Replace(eMensaje, "[41]", ValNull(registroDS.Tables(0).Rows(0)!nlote, "A"))
-                                            eMensaje = Replace(eMensaje, "[42]", ValNull(registroDS.Tables(0).Rows(0)!referencia, "A"))
-                                            eMensaje = Replace(eMensaje, "[43]", ValNull(registroDS.Tables(0).Rows(0)!producto, "A"))
-                                            eMensaje = Replace(eMensaje, "[70]", ValNull(registroDS.Tables(0).Rows(0)!ruta_antes, "A"))
-                                            eMensaje = Replace(eMensaje, "[71]", ValNull(registroDS.Tables(0).Rows(0)!ruta_secuencia_antes, "A"))
-                                            eMensaje = Replace(eMensaje, "[72]", ValNull(registroDS.Tables(0).Rows(0)!ruta_despues, "A"))
-                                            eMensaje = Replace(eMensaje, "[73]", ValNull(registroDS.Tables(0).Rows(0)!ruta_secuencia, "A"))
-
-                                        ElseIf elmensaje!evento = 302 Or elmensaje!evento = 305 Then
-                                            eMensaje = Replace(eMensaje, "[41]", ValNull(registroDS.Tables(0).Rows(0)!nlote, "A"))
-                                            eMensaje = Replace(eMensaje, "[42]", ValNull(registroDS.Tables(0).Rows(0)!referencia, "A"))
-                                            eMensaje = Replace(eMensaje, "[43]", ValNull(registroDS.Tables(0).Rows(0)!producto, "A"))
-                                            eMensaje = Replace(eMensaje, "[40]", ValNull(registroDS.Tables(0).Rows(0)!nproceso, "A"))
-                                            eMensaje = Replace(eMensaje, "[44]", ValNull(registroDS.Tables(0).Rows(0)!ruta_actual, "A"))
-                                            eMensaje = Replace(eMensaje, "[45]", ValNull(registroDS.Tables(0).Rows(0)!ruta_secuencia, "A"))
-                                            eMensaje = Replace(eMensaje, "[50]", Format(registroDS.Tables(0).Rows(0)!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[51]", Format(registroDS.Tables(0).Rows(0)!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[52]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, registroDS.Tables(0).Rows(0)!hasta, DateAndTime.Now)))
-                                            eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(registroDS.Tables(0).Rows(0)!previo))
-                                        ElseIf elmensaje!evento = 303 Or elmensaje!evento = 306 Then
-                                            eMensaje = Replace(eMensaje, "[41]", ValNull(registroDS.Tables(0).Rows(0)!nlote, "A"))
-                                            eMensaje = Replace(eMensaje, "[42]", ValNull(registroDS.Tables(0).Rows(0)!referencia, "A"))
-                                            eMensaje = Replace(eMensaje, "[43]", ValNull(registroDS.Tables(0).Rows(0)!producto, "A"))
-                                            eMensaje = Replace(eMensaje, "[40]", ValNull(registroDS.Tables(0).Rows(0)!nproceso, "A"))
-                                            eMensaje = Replace(eMensaje, "[44]", ValNull(registroDS.Tables(0).Rows(0)!ruta_actual, "A"))
-                                            eMensaje = Replace(eMensaje, "[45]", ValNull(registroDS.Tables(0).Rows(0)!ruta_secuencia, "A"))
-                                            eMensaje = Replace(eMensaje, "[61]", ValNull(registroDS.Tables(0).Rows(0)!equipo, "A"))
-                                            eMensaje = Replace(eMensaje, "[62]", Format(registroDS.Tables(0).Rows(0)!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[63]", Format(registroDS.Tables(0).Rows(0)!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[64]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, registroDS.Tables(0).Rows(0)!hasta, DateAndTime.Now)))
-                                            eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(registroDS.Tables(0).Rows(0)!previo))
-                                        ElseIf elmensaje!evento = 304 Or elmensaje!evento = 307 Then
-                                            eMensaje = Replace(eMensaje, "[80]", ValNull(registroDS.Tables(0).Rows(0)!carga, "A"))
-                                            eMensaje = Replace(eMensaje, "[40]", ValNull(registroDS.Tables(0).Rows(0)!nproceso, "A"))
-                                            eMensaje = Replace(eMensaje, "[61]", ValNull(registroDS.Tables(0).Rows(0)!nequipo, "A"))
-                                            eMensaje = Replace(eMensaje, "[81]", Format(registroDS.Tables(0).Rows(0)!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[82]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, registroDS.Tables(0).Rows(0)!fecha, DateAndTime.Now)))
-                                            eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(registroDS.Tables(0).Rows(0)!previo))
-                                            eMensaje = Replace(eMensaje, "[84]", ValNull(registroDS.Tables(0).Rows(0)!texto, "A"))
-
-
-                                        End If
-
-
-
-                                        Dim antes As String = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç"
-                                        Dim ahora As String = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc"
-                                        For i = 0 To antes.Length - 1
-                                            eMensaje = Replace(eMensaje, antes(i), ahora(i))
-                                        Next
-                                        eMensaje = Replace(eMensaje, ";", " ")
-                                        eMensaje = Replace(eMensaje, "\", "-")
-                                        eMensaje = Replace(eMensaje, "/", "-")
-                                        eMensaje = Replace(eMensaje, "[90]", "")
-                                        eMensaje = Replace(eMensaje, System.Environment.NewLine, " ")
-
-
-                                        'Se cambian los caracteres especiales
-
-                                    Else
-                                        If registroDS.Tables(0).Rows(0)!tipoalerta = 101 Then
-                                            eMensaje = "REPORTE " & nroReporte & " TIEMPO ESPERA EXCED"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 102 Then
-                                            eMensaje = "REPORTE " & nroReporte & " TIEMPO REPARAC EXCED"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 103 Then
-                                            eMensaje = "REPORTE " & nroReporte & " TIEMPO INFORME EXCED"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 201 Then
-                                            eMensaje = "BAJO RATE EN " & laMaquina
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 202 Then
-                                            eMensaje = "SOBRE RATE EN " & laMaquina
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 203 Then
-                                            eMensaje = laMaquina & " NO SE DETECTAN PIEZAS"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 301 Then
-                                            eMensaje = "SALTO DE OPERACION"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 302 Then
-                                            eMensaje = "TIEMPO DE STOCK VENCIDO"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 303 Then
-                                            eMensaje = "TIEMPO DE PROCESO VENCIDO"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 304 Then
-                                            eMensaje = "TIEMPO DE ENTREGA VENCIDO"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 305 Then
-                                            eMensaje = "TIEMPO DE STOCK POR VENCER"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 306 Then
-                                            eMensaje = "TIEMPO DE PROCESO POR VENCER"
-                                        ElseIf registroDS.Tables(0).Rows(0)!tipoalerta = 307 Then
-                                            eMensaje = "TIEMPO DE ENTREGA POR VENCER"
-                                        End If
-                                        agregarLOG("La alerta " & registroDS.Tables(0).Rows(0)!idalerta & " no tiene un mensaje de MMCall definido se tomó el mensaje por defecto", nroReporte, 2)
-
-                                    End If
-
-                                End If
-                            End If
-                        End If
-                        If generarMensaje And canales.Length > 0 Then
-                            Dim mmcalls As String()
-                            Dim tempArray As String()
-                            Dim totalItems = 0
-                            If canales.Length > 0 Then
-                                Dim arreCanales = canales.Split(New Char() {";"c})
-                                For i = LBound(arreCanales) To UBound(arreCanales)
-                                    'Redimensionamos el Array temporal y preservamos el valor  
-                                    ReDim Preserve mmcalls(totalItems + i)
-                                    mmcalls(totalItems + i) = arreCanales(i)
-                                Next
-                                tempArray = mmcalls
-                                totalItems = mmcalls.Length
-
-                                Dim x As Integer, y As Integer
-                                Dim z As Integer
-
-                                For x = 0 To UBound(mmcalls)
-                                    z = 0
-                                    For y = 0 To UBound(mmcalls) - 1
-                                        'Si el elemento del array es igual al array temporal  
-                                        If mmcalls(x) = tempArray(z) And y <> x Then
-                                            'Entonces Eliminamos el valor duplicado  
-                                            mmcalls(y) = ""
-                                        End If
-                                        z = z + 1
-                                    Next y
-                                Next x
-                                canales = ""
-                            End If
-                            If maximo_largo_mmcall = 0 Then maximo_largo_mmcall = 40
-                            eMensaje = Microsoft.VisualBasic.Strings.Left(eMensaje, maximo_largo_mmcall).Trim
-                            mensajeGenerado = False
-                            For i = 0 To UBound(mmcalls)
-                                If mmcalls(i).Length > 0 Then
-                                    'Se valida el reloj
-                                    Dim posReloj = Strings.InStr(mmcalls(i), "number=")
-                                    Dim iReloj = Strings.Mid(mmcalls(i), posReloj + 7)
-                                    If Not valReloj(iReloj) Then
-                                        agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
-                                        Continue For
-                                    End If
-                                    respuestaWS = ""
-
-                                    Try
-                                        If validarURI(mmcalls(i) & "&message=" & eMensaje) Then
-                                            Dim fr As System.Net.HttpWebRequest
-                                            Dim targetURI As New Uri(mmcalls(i) & "&message=" & eMensaje)
-
-                                            fr = DirectCast(HttpWebRequest.Create(targetURI), System.Net.HttpWebRequest)
-                                            If (fr.GetResponse().ContentLength > 0) Then
-                                                Dim str As New System.IO.StreamReader(fr.GetResponse().GetResponseStream())
-                                                respuestaWS = str.ReadToEnd
-                                                str.Close()
-                                            End If
-                                            mensajeGenerado = respuestaWS = "success" And Not mensajeGenerado
-                                            If mensajeGenerado Then
-                                                audiosGen = audiosGen + 1
-                                            Else
-                                                audiosNGen = audiosNGen + 1
-                                                agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & respuestaWS, nroReporte, 9)
-                                            End If
-                                        Else
-                                            audiosNGen = audiosNGen + 1
-                                            agregarLOG("" & mmcalls(i) & "&message=" & eMensaje & " error: la dirección no es válida", nroReporte, 9)
-                                        End If
-                                    Catch ex As System.Net.WebException
-                                        agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & ex.Message,  , 9)
-                                        audiosNGen = audiosNGen + 1
-                                        miError = ex.Message
-                                    End Try
-                                End If
-                            Next
-                        End If
-                        'If mensajeGenerado Then
-                        cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW()  WHERE id = " & elmensaje!id
-                        If optimizar Then
-                            If elmensaje!cuenta > 1 Then
-                                cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE canal = 3 AND lista = " & elmensaje!lista & " AND estatus = '" & idProceso & "'"
-                                If mantenerPrioridad Then
-                                    cadSQL = cadSQL & " AND prioridad = " & elmensaje!prioridad
-                                End If
-                            End If
-                        End If
-                        regsAfectados = consultaACT(cadSQL)
-                        'End If
-                    Next
-                    If audiosGen > 0 Or audiosNGen > 0 Then
-                        agregarLOG("Se generaron " & audiosGen & " mensaje(s) a MMCall y no se generaron " & audiosNGen & " mensaje(s) a MMCall ")
-                    End If
-                End If
-            End If
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 4 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
         End If
-        Application.Exit()
+        traduccion = cadenaTrad.Split(New Char() {";"c})
     End Sub
 End Module

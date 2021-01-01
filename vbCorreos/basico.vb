@@ -15,159 +15,258 @@ Module basico
     Public cadenaConexion As String
     Public be_log_activar As Boolean = False
     Public rutaBD As String = "sigma"
+    Public traduccion As String()
+    Public be_idioma
+
 
     Sub Main(argumentos As String())
+
+        'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
+        'reporteHoraxHora(3, 0)
+
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
             cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-            Dim idProceso = Process.GetCurrentProcess.Id
-
-            Dim mensajesDS As DataSet
-            Dim eMensaje = ""
-            Dim eTitulo = ""
-            Dim audiosGen = 0
-            Dim audiosNGen = 0
-            Dim mTotal = 0
-            'Escalada 4
-            Dim miError As String = ""
-            Dim optimizar As Boolean = False
-            Dim mantenerPrioridad As Boolean = False
-            Dim correo_titulo_falla As Boolean
-            Dim correo_titulo As String
-            Dim correo_cuerpo As String
-            Dim correo_firma As String
-            Dim correo_cuenta As String
-            Dim correo_puerto As String
-            Dim correo_ssl As Boolean
-            Dim correo_clave As String
-            Dim correo_host As String
-            Dim separador_mail As String
-            Dim mensajeGenerado As Boolean = False
-            Dim be_alarmas_correos As Boolean = False
-            Dim regsAfectados = 0
-            Dim registroDS As DataSet
-
-            Dim canales As String = ""
-            Dim laLinea As String = ""
-            Dim laMaquina As String = ""
-            Dim laArea As String = ""
-            Dim laFalla As String = ""
-            Dim elLote As String = ""
-            Dim elProceso As String = ""
-            Dim laCarga As String = ""
-            Dim fecha
-            Dim tiempo As String = ""
-            Dim nroReporte As Integer = 0
-
-            Dim cadSQL As String = "SELECT * FROM " & rutaBD & ".configuracion"
-            Dim readerDS As DataSet = consultaSEL(cadSQL)
-            Dim escape_mensaje = ""
-            If readerDS.Tables(0).Rows.Count > 0 Then
-                Dim reader As DataRow = readerDS.Tables(0).Rows(0)
-                optimizar = ValNull(reader!optimizar_correo, "A") = "S"
-                be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
-                mantenerPrioridad = ValNull(reader!optimizar_mmcall, "A") = "S"
-                correo_titulo_falla = ValNull(reader!correo_titulo_falla, "A") = "S"
-                be_alarmas_correos = ValNull(reader!be_alarmas_correos, "A") = "S"
-                correo_titulo = ValNull(reader!correo_titulo, "A")
-                correo_cuerpo = ValNull(reader!correo_cuerpo, "A")
-                correo_firma = ValNull(reader!correo_firma, "A")
-                correo_cuenta = ValNull(reader!correo_cuenta, "A")
-                correo_clave = ValNull(reader!correo_clave, "A")
-                correo_puerto = ValNull(reader!correo_puerto, "A")
-                correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
-                escape_mensaje = ValNull(reader!escape_mensaje, "A")
-                correo_host = ValNull(reader!correo_host, "A")
-                separador_mail = ValNull(reader!separador_mail, "A")
-            End If
-            If separador_mail = "" Then separador_mail = ";"
-            If correo_firma.Length = 0 Then
-                correo_firma = "Le agradecemos no responder a este correo, se envía desde una cuenta no supervisada."
-            End If
-            If correo_titulo.Length = 0 Then
-                correo_titulo = "SIGMA Monitor versión 1.0"
-            End If
-
-            If be_alarmas_correos Then
-
-                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 2 AND estatus = 'E'")
-                Dim agrupado As Boolean = True
-                If Not optimizar Then
-                    cadSQL = "SELECT a.id, d.correos, a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
-                    agrupado = False
-                ElseIf mantenerPrioridad Then
-                    cadSQL = "SELECT a.lista, a.prioridad, b.correos, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, b.correos ORDER BY prioridad DESC"
+            If argumentos.Length = 2 Then
+                If argumentos(1) = "test" Then
+                    pruebaMail()
                 Else
-                    cadSQL = "SELECT a.lista, b.correos, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.lista, b.correos"
-
+                    agregarLOG("Se invoca al programa para el envío de correos", 9, 0)
+                    Dim arreParametros = argumentos(1).Split(New Char() {";"c})
+                    If arreParametros(0) = "oee_por_turno" Then
+                        reporteOEEporTurno(Val(arreParametros(1)))
+                        'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+                        'reporteOEEporTurno(3)
+                    ElseIf arreParametros(0) = "hxh_por_turno" Or arreParametros(0) = "hxh_por_hora" Or arreParametros(0) = "hxh_por_dia" Then
+                        agregarLOG("Reporte a ejecutar: " & arreParametros(0), 9, 0)
+                        Dim parametro = 1
+                        If arreParametros(0) = "hxh_por_hora" Then
+                            parametro = 2
+                        ElseIf arreParametros(0) = "hxh_por_dia" Then
+                            parametro = 3
+                        End If
+                        reporteHoraxHora(parametro, Val(arreParametros(1)))
+                    End If
                 End If
-                'Se preselecciona la voz
-                mensajesDS = consultaSEL(cadSQL)
-                If mensajesDS.Tables(0).Rows.Count > 0 Then
-                    Dim enlazado As Boolean = False
-                    Dim smtpServer As New SmtpClient()
+            Else
+                'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+                Dim idProceso = Process.GetCurrentProcess.Id
 
-                    Try
-                        smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
-                        smtpServer.Port = correo_puerto
-                        smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
-                        smtpServer.EnableSsl = correo_ssl
-                        enlazado = True
-                    Catch ex As Exception
-                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'A' WHERE canal = 2 AND estatus = '" & idProceso & "'")
-                        smtpServer.Dispose()
-                    End Try
-                    If enlazado Then
-                        For Each elmensaje In mensajesDS.Tables(0).Rows
-                            canales = ValNull(elmensaje!correos, "A")
-                            If canales.Length > 0 Then
-                                eMensaje = ""
-                                eTitulo = ""
-                                Dim cadWhere = "AND a.lista = " & elmensaje!lista
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
+                Dim mensajesDS As DataSet
+                Dim eMensaje = ""
+                Dim eTitulo = ""
+                Dim audiosGen = 0
+                Dim audiosNGen = 0
+                Dim mTotal = 0
+                'Escalada 4
+                Dim miError As String = ""
+                Dim optimizar As Boolean = False
+                Dim mantenerPrioridad As Boolean = False
+                Dim correo_titulo_falla As Boolean
+                Dim correo_titulo As String
+                Dim correo_firma As String
+                Dim correo_cuenta As String
+                Dim correo_puerto As String
+                Dim correo_ssl As Boolean
+                Dim correo_clave As String
+                Dim correo_host As String
+                Dim separador_mail As String
+                Dim mensajeGenerado As Boolean = False
+                Dim be_alarmas_correos As Boolean = False
+                Dim regsAfectados = 0
+                Dim registroDS As DataSet
 
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
+                Dim canales As String = ""
+                Dim laLinea As String = ""
+                Dim laMaquina As String = ""
+                Dim laArea As String = ""
+                Dim laFalla As String = ""
+                Dim elLote As String = ""
+                Dim elProceso As String = ""
+                Dim laCarga As String = ""
+                Dim fecha
+                Dim tiempo As String = ""
+                Dim nroReporte As Integer = 0
+
+                Dim cadSQL As String = "SELECT * FROM " & rutaBD & ".configuracion"
+                Dim readerDS As DataSet = consultaSEL(cadSQL)
+                Dim escape_mensaje = ""
+                If readerDS.Tables(0).Rows.Count > 0 Then
+                    Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+                    be_idioma = ValNull(reader!idioma_defecto, "N")
+                    etiquetas()
+                    optimizar = ValNull(reader!optimizar_correo, "A") = "S"
+                    be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
+                    mantenerPrioridad = ValNull(reader!optimizar_mmcall, "A") = "S"
+                    correo_titulo_falla = ValNull(reader!correo_titulo_falla, "A") = "S"
+                    be_alarmas_correos = ValNull(reader!be_alarmas_correos, "A") = "S"
+                    correo_cuenta = ValNull(reader!correo_cuenta, "A")
+                    correo_clave = ValNull(reader!correo_clave, "A")
+                    correo_puerto = ValNull(reader!correo_puerto, "A")
+                    correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
+                    escape_mensaje = ValNull(reader!escape_mensaje, "A")
+                    correo_host = ValNull(reader!correo_host, "A")
+                    separador_mail = ValNull(reader!separador_mail, "A")
+                End If
+                If separador_mail = "" Then separador_mail = ";"
+                If correo_firma.Length = 0 Then
+                    correo_firma = traduccion(0)
+                End If
+                If correo_titulo.Length = 0 Then
+                    correo_titulo = traduccion(1)
+                End If
+
+                If be_alarmas_correos Then
+
+                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 2 AND estatus = 'E' AND alerta >= 0")
+                    Dim agrupado As Boolean = True
+                    If Not optimizar Then
+                        cadSQL = "SELECT a.id, d.correos, a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+                        agrupado = False
+
+                    ElseIf mantenerPrioridad Then
+                        cadSQL = "SELECT a.lista, a.prioridad, b.correos, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, b.correos ORDER BY prioridad DESC"
+                    Else
+                        cadSQL = "SELECT a.lista, b.correos, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.lista, b.correos"
+
+                    End If
+                    'Se preselecciona la voz
+                    mensajesDS = consultaSEL(cadSQL)
+                    If mensajesDS.Tables(0).Rows.Count > 0 Then
+                        Dim enlazado As Boolean = False
+                        Dim smtpServer As New SmtpClient()
+
+                        Try
+                            smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                            smtpServer.Port = correo_puerto
+                            smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
+                            smtpServer.EnableSsl = correo_ssl
+                            enlazado = True
+                        Catch ex As Exception
+                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'A' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                            smtpServer.Dispose()
+                        End Try
+                        If enlazado Then
+                            For Each elmensaje In mensajesDS.Tables(0).Rows
+                                canales = ValNull(elmensaje!correos, "A")
+                                If canales.Length > 0 Then
+                                    eMensaje = ""
+                                    eTitulo = ""
+                                    Dim cadWhere = "AND a.lista = " & elmensaje!lista
+                                    If elmensaje!cuenta > 1 Then
+                                        eMensaje = traduccion(2).Replace("campo_0", elmensaje!cuenta)
+                                        If mantenerPrioridad And elmensaje!prioridad > 0 Then
+                                            eMensaje = traduccion(3).Replace("campo_0", elmensaje!cuenta)
+                                        End If
+
+                                        If mantenerPrioridad Then
+                                            cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
+                                        End If
+                                        cadSQL = "SELECT a.id, z.texto, z.titulo FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje WHERE a.estatus = '" & idProceso & "' " & cadWhere
+                                    Else
+                                        cadSQL = "SELECT a.id, z.texto, z.titulo FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje WHERE a.id = " & elmensaje!id
                                     End If
-                                    cadSQL = "SELECT a.id, z.texto, z.titulo FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.id, z.texto, z.titulo FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje WHERE a.id = " & elmensaje!id
-                                End If
-                                Dim mensajeCorreo As String = ""
-                                registroDS = consultaSEL(cadSQL)
-                                Dim linCorreo = 0
-                                If registroDS.Tables(0).Rows.Count > 0 Then
-                                    For Each elCorreo In registroDS.Tables(0).Rows
-                                        linCorreo = linCorreo + 1
-                                        If elmensaje!cuenta > 1 Then
-                                            If linCorreo = 1 Then
-                                                mensajeCorreo = "Mensaje " & linCorreo & " de " & elmensaje!cuenta & vbCrLf
-                                            Else
-                                                mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & "Mensaje " & linCorreo & " de " & elmensaje!cuenta & vbCrLf
+                                    Dim mensajeCorreo As String = ""
+                                    registroDS = consultaSEL(cadSQL)
+                                    Dim linCorreo = 0
+                                    If registroDS.Tables(0).Rows.Count > 0 Then
+                                        For Each elCorreo In registroDS.Tables(0).Rows
+                                            linCorreo = linCorreo + 1
+                                            If elmensaje!cuenta > 1 Then
+                                                If linCorreo = 1 Then
+                                                    mensajeCorreo = traduccion(19) & linCorreo & traduccion(20) & elmensaje!cuenta & vbCrLf
+                                                Else
+                                                    mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & traduccion(19) & linCorreo & traduccion(20) & elmensaje!cuenta & vbCrLf
+                                                End If
+                                            End If
+                                            eMensaje = ValNull(elCorreo!texto, "A")
+                                            mensajeCorreo = mensajeCorreo & eMensaje & vbCrLf
+                                            eTitulo = ValNull(elCorreo!titulo, "A")
+                                        Next
+                                        If eTitulo.Length = 0 Then
+                                            eTitulo = correo_titulo
+                                        End If
+                                        mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & correo_firma
+
+                                        Dim correos As String()
+                                        Dim tempArray As String()
+                                        Dim totalItems = 0
+                                        If canales.Length > 0 Then
+                                            Dim arreCanales = canales.Split(New Char() {";"c})
+                                            For i = LBound(arreCanales) To UBound(arreCanales)
+                                                'Redimensionamos el Array temporal y preservamos el valor  
+                                                ReDim Preserve correos(totalItems + i)
+                                                correos(totalItems + i) = arreCanales(i)
+                                            Next
+                                            tempArray = correos
+                                            totalItems = correos.Length
+
+                                            Dim x As Integer, y As Integer
+                                            Dim z As Integer
+
+                                            For x = 0 To UBound(correos)
+                                                z = 0
+                                                For y = 0 To UBound(correos) - 1
+                                                    'Si el elemento del array es igual al array temporal  
+                                                    If correos(x) = tempArray(z) And y <> x Then
+                                                        'Entonces Eliminamos el valor duplicado  
+                                                        correos(y) = ""
+                                                    End If
+                                                    z = z + 1
+                                                Next y
+                                            Next x
+                                        End If
+                                        mensajeGenerado = False
+                                        Dim mail As New MailMessage
+                                        Try
+                                            mail.From = New MailAddress(correo_cuenta)
+                                            For i = 0 To UBound(correos)
+                                                If correos(i).Length > 0 Then
+                                                    mail.To.Add(correos(i))
+                                                End If
+                                            Next i
+
+                                            mail.Subject = eTitulo
+                                            mail.Body = mensajeCorreo
+                                            smtpServer.Send(mail)
+                                            audiosGen = audiosGen + 1
+                                            mensajeGenerado = True
+                                        Catch ex As Exception
+                                            audiosNGen = audiosNGen + 1
+                                            agregarLOG(ex.Message, 9, nroReporte)
+                                        Finally
+                                            mail.Dispose()
+                                        End Try
+                                        cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
+                                        If optimizar Then
+                                            If elmensaje!cuenta > 1 Then
+                                                cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE canal = 2 AND lista = " & elmensaje!lista & " AND estatus = '" & idProceso & "'"
+                                                If mantenerPrioridad Then
+                                                    cadSQL = cadSQL & " AND prioridad = " & elmensaje!prioridad
+                                                End If
                                             End If
                                         End If
-                                        eMensaje = ValNull(elCorreo!texto, "A")
-                                        mensajeCorreo = mensajeCorreo & eMensaje & vbCrLf
-                                        eTitulo = ValNull(elCorreo!titulo, "A")
-                                    Next
-                                    If eTitulo.Length = 0 Then
-                                        eTitulo = correo_titulo
+                                        regsAfectados = consultaACT(cadSQL)
                                     End If
-                                    mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & correo_firma
+                                End If
 
-                                    Dim correos As String()
-                                    Dim tempArray As String()
-                                    Dim totalItems = 0
+                            Next
+                            cadSQL = "SELECT a.id, a.texto, b.correos FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' WHERE a.alerta = 0 AND a.canal = 2 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+                            mensajesDS = consultaSEL(cadSQL)
+                            Dim generarMensaje = False
+                            If mensajesDS.Tables(0).Rows.Count > 0 Then
+                                For Each elmensaje In mensajesDS.Tables(0).Rows
+                                    canales = ValNull(elmensaje!correos, "A")
+                                    eMensaje = traduccion(22) & ValNull(elmensaje!texto, "A")
                                     If canales.Length > 0 Then
                                         Dim arreCanales = canales.Split(New Char() {";"c})
+                                        Dim correos As String()
+                                        Dim tempArray As String()
+                                        Dim totalItems = 0
+
                                         For i = LBound(arreCanales) To UBound(arreCanales)
                                             'Redimensionamos el Array temporal y preservamos el valor  
                                             ReDim Preserve correos(totalItems + i)
@@ -190,62 +289,77 @@ Module basico
                                                 z = z + 1
                                             Next y
                                         Next x
-                                    End If
-                                    mensajeGenerado = False
-                                    Dim mail As New MailMessage
-                                    Try
-                                        mail.From = New MailAddress(correo_cuenta)
-                                        For i = 0 To UBound(correos)
-                                            If correos(i).Length > 0 Then
-                                                mail.To.Add(correos(i))
-                                            End If
-                                        Next i
+                                        mensajeGenerado = False
+                                        Dim mail As New MailMessage
+                                        Try
+                                            mail.From = New MailAddress(correo_cuenta)
+                                            For i = 0 To UBound(correos)
+                                                If correos(i).Length > 0 Then
+                                                    mail.To.Add(correos(i))
+                                                End If
+                                            Next i
 
-                                        mail.Subject = eTitulo
-                                        mail.Body = mensajeCorreo
-                                        smtpServer.Send(mail)
-                                        audiosGen = audiosGen + 1
-                                        mensajeGenerado = True
-                                    Catch ex As Exception
-                                        audiosNGen = audiosNGen + 1
-                                        agregarLOG(ex.Message, 9, nroReporte)
-                                    Finally
-                                        mail.Dispose()
-                                    End Try
-                                    cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
-                                    If optimizar Then
-                                        If elmensaje!cuenta > 1 Then
-                                            cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE canal = 2 AND lista = " & elmensaje!lista & " AND estatus = '" & idProceso & "'"
-                                            If mantenerPrioridad Then
-                                                cadSQL = cadSQL & " AND prioridad = " & elmensaje!prioridad
-                                            End If
-                                        End If
+                                            mail.Subject = eMensaje
+                                            mail.Body = eMensaje
+                                            smtpServer.Send(mail)
+                                            audiosGen = audiosGen + 1
+                                            mensajeGenerado = True
+                                        Catch ex As Exception
+                                            audiosNGen = audiosNGen + 1
+                                            agregarLOG(ex.Message, 9, nroReporte)
+                                        Finally
+                                            mail.Dispose()
+                                        End Try
                                     End If
-                                    regsAfectados = consultaACT(cadSQL)
+                                    If mensajeGenerado Then
+                                        cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
+                                        regsAfectados = consultaACT(cadSQL)
+                                    End If
+                                Next
+                                If audiosGen > 0 Or audiosNGen > 0 Then
+                                    agregarLOG(traduccion(23))
                                 End If
                             End If
+                        End If
+                        If audiosGen > 0 Or audiosNGen > 0 Then
+                            agregarLOG(traduccion(23).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
+                        End If
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'Z' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                        smtpServer.Dispose()
+                    End If
 
-                        Next
-                        cadSQL = "SELECT a.id, a.texto, b.correos FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' WHERE a.alerta = 0 AND a.canal = 2 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
-                        mensajesDS = consultaSEL(cadSQL)
-                        Dim generarMensaje = False
-                        If mensajesDS.Tables(0).Rows.Count > 0 Then
+                    'Checklist
+                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 2 AND estatus = 'E' AND alerta = -1000")
+                    cadSQL = "SELECT a.id, d.correos, 0, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' AND a.alerta = -1000 ORDER BY a.prioridad DESC, a.id"
+                    mensajesDS = consultaSEL(cadSQL)
+                    If mensajesDS.Tables(0).Rows.Count > 0 Then
+                        Dim enlazado As Boolean = False
+                        Dim smtpServer As New SmtpClient()
+
+                        Try
+                            smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                            smtpServer.Port = correo_puerto
+                            smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
+                            smtpServer.EnableSsl = correo_ssl
+                            enlazado = True
+                        Catch ex As Exception
+                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'A' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                            smtpServer.Dispose()
+                        End Try
+                        If enlazado Then
                             For Each elmensaje In mensajesDS.Tables(0).Rows
                                 canales = ValNull(elmensaje!correos, "A")
-                                eMensaje = "Se agotó el número de intentos de llamada para el teléfono " & ValNull(elmensaje!texto, "A")
+                                Dim correos As String()
+                                Dim tempArray As String()
+                                Dim totalItems = 0
                                 If canales.Length > 0 Then
                                     Dim arreCanales = canales.Split(New Char() {";"c})
-                                    Dim correos As String()
-                                    Dim tempArray As String()
-                                    Dim totalItems = 0
-
                                     For i = LBound(arreCanales) To UBound(arreCanales)
                                         'Redimensionamos el Array temporal y preservamos el valor  
                                         ReDim Preserve correos(totalItems + i)
                                         correos(totalItems + i) = arreCanales(i)
                                     Next
                                     tempArray = correos
-                                    totalItems = correos.Length
 
                                     Dim x As Integer, y As Integer
                                     Dim z As Integer
@@ -261,43 +375,118 @@ Module basico
                                             z = z + 1
                                         Next y
                                     Next x
-                                    mensajeGenerado = False
-                                    Dim mail As New MailMessage
-                                    Try
-                                        mail.From = New MailAddress(correo_cuenta)
-                                        For i = 0 To UBound(correos)
-                                            If correos(i).Length > 0 Then
-                                                mail.To.Add(correos(i))
-                                            End If
-                                        Next i
-
-                                        mail.Subject = eMensaje
-                                        mail.Body = eMensaje
-                                        smtpServer.Send(mail)
-                                        audiosGen = audiosGen + 1
-                                        mensajeGenerado = True
-                                    Catch ex As Exception
-                                        audiosNGen = audiosNGen + 1
-                                        agregarLOG(ex.Message, 9, nroReporte)
-                                    Finally
-                                        mail.Dispose()
-                                    End Try
                                 End If
-                                If mensajeGenerado Then
+                                mensajeGenerado = False
+                                Dim mail As New MailMessage
+                                Try
+                                    mail.From = New MailAddress(correo_cuenta)
+                                    For i = 0 To UBound(correos)
+                                        If correos(i).Length > 0 Then
+                                            mail.To.Add(correos(i))
+                                        End If
+                                    Next i
+
+                                    mail.Subject = ValNull(elmensaje!titulo, "A")
+                                    mail.Body = ValNull(elmensaje!texto, "A")
+                                    smtpServer.Send(mail)
+                                    audiosGen = audiosGen + 1
+                                    mensajeGenerado = True
                                     cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
                                     regsAfectados = consultaACT(cadSQL)
-                                End If
+                                Catch ex As Exception
+                                    audiosNGen = audiosNGen + 1
+                                    agregarLOG(ex.Message, 9, nroReporte)
+                                Finally
+                                    mail.Dispose()
+                                End Try
                             Next
-                            If audiosGen > 0 Or audiosNGen > 0 Then
-                                agregarLOG("Se generaron " & audiosGen & " audio(s) y no se generaron " & audiosNGen & " audio(s)")
-                            End If
                         End If
+                        If audiosGen > 0 Or audiosNGen > 0 Then
+                            agregarLOG(traduccion(23).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
+                        End If
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'Z' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                        smtpServer.Dispose()
                     End If
-                    If audiosGen > 0 Or audiosNGen > 0 Then
-                        agregarLOG("Se generaron " & audiosGen & " correo(s) y no se generaron " & audiosNGen & " correo(s)")
+
+                    'Checklist individuales
+                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 2 AND estatus = 'E' AND alerta = -2000")
+                    cadSQL = "SELECT a.id, d.correos, 0, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".checklist_correos d ON a.id = d.mensaje WHERE a.estatus = '" & idProceso & "' AND a.alerta = -2000 ORDER BY a.prioridad DESC, a.id"
+                    mensajesDS = consultaSEL(cadSQL)
+                    If mensajesDS.Tables(0).Rows.Count > 0 Then
+                        Dim enlazado As Boolean = False
+                        Dim smtpServer As New SmtpClient()
+
+                        Try
+                            smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                            smtpServer.Port = correo_puerto
+                            smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
+                            smtpServer.EnableSsl = correo_ssl
+                            enlazado = True
+                        Catch ex As Exception
+                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'A' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                            smtpServer.Dispose()
+                        End Try
+                        If enlazado Then
+                            For Each elmensaje In mensajesDS.Tables(0).Rows
+                                canales = ValNull(elmensaje!correos, "A")
+                                Dim correos As String()
+                                Dim tempArray As String()
+                                Dim totalItems = 0
+                                If canales.Length > 0 Then
+                                    Dim arreCanales = canales.Split(New Char() {";"c})
+                                    For i = LBound(arreCanales) To UBound(arreCanales)
+                                        'Redimensionamos el Array temporal y preservamos el valor  
+                                        ReDim Preserve correos(totalItems + i)
+                                        correos(totalItems + i) = arreCanales(i)
+                                    Next
+                                    tempArray = correos
+
+                                    Dim x As Integer, y As Integer
+                                    Dim z As Integer
+
+                                    For x = 0 To UBound(correos)
+                                        z = 0
+                                        For y = 0 To UBound(correos) - 1
+                                            'Si el elemento del array es igual al array temporal  
+                                            If correos(x) = tempArray(z) And y <> x Then
+                                                'Entonces Eliminamos el valor duplicado  
+                                                correos(y) = ""
+                                            End If
+                                            z = z + 1
+                                        Next y
+                                    Next x
+                                End If
+                                mensajeGenerado = False
+                                Dim mail As New MailMessage
+                                Try
+                                    mail.From = New MailAddress(correo_cuenta)
+                                    For i = 0 To UBound(correos)
+                                        If correos(i).Length > 0 Then
+                                            mail.To.Add(correos(i))
+                                        End If
+                                    Next i
+
+                                    mail.Subject = ValNull(elmensaje!titulo, "A")
+                                    mail.Body = ValNull(elmensaje!texto, "A")
+                                    smtpServer.Send(mail)
+                                    audiosGen = audiosGen + 1
+                                    mensajeGenerado = True
+                                    cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id & ";DELETE FROM " & rutaBD & ".checklist_correos WHERE mensaje = " & elmensaje!id
+                                    regsAfectados = consultaACT(cadSQL)
+                                Catch ex As Exception
+                                    audiosNGen = audiosNGen + 1
+                                    agregarLOG(ex.Message, 9, nroReporte)
+                                Finally
+                                    mail.Dispose()
+                                End Try
+                            Next
+                        End If
+                        If audiosGen > 0 Or audiosNGen > 0 Then
+                            agregarLOG(traduccion(23).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
+                        End If
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'Z' WHERE canal = 2 AND estatus = '" & idProceso & "'")
+                        smtpServer.Dispose()
                     End If
-                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'Z' WHERE canal = 2 AND estatus = '" & idProceso & "'")
-                    smtpServer.Dispose()
                 End If
             End If
         End If
@@ -321,6 +510,7 @@ Module basico
                 errorBD = ex.Message
             End Try
         End If
+
         miConexion.Dispose()
         miConexion.Close()
         miConexion = Nothing
@@ -439,11 +629,11 @@ Module basico
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(24)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(25)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(26)
         End If
     End Function
 
@@ -463,667 +653,955 @@ Module basico
         Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
     End Sub
 
-    Sub MainAntes(argumentos As String())
-        If Process.GetProcessesByName _
-          (Process.GetCurrentProcess.ProcessName).Length > 1 Then
-        ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
-        Else
-            cadenaConexion = argumentos(0)
-            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-            Dim idProceso = Process.GetCurrentProcess.Id
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 3 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+    End Sub
+    Sub pruebaMail()
+        Dim cadSQL As String = "SELECT idioma_defecto, correo_cuenta, correo_clave, correo_puerto, correo_ssl, correo_host FROM " & rutaBD & ".configuracion"
+        Dim readerDS As DataSet = consultaSEL(cadSQL)
+        Dim escape_mensaje = ""
+        If readerDS.Tables(0).Rows.Count > 0 Then
+            Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+            be_idioma = ValNull(reader!idioma_defecto, "N")
+            etiquetas()
+            agregarLOG(traduccion(28), 9, 0)
+            Dim correo_cuenta As String = ValNull(reader!correo_cuenta, "A")
+            Dim correo_clave As String = ValNull(reader!correo_clave, "A")
+            Dim correo_puerto = ValNull(reader!correo_puerto, "A")
+            Dim correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
+            Dim correo_host = ValNull(reader!correo_host, "A")
+            Dim smtpServer As New SmtpClient()
+            Try
+                smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                smtpServer.Port = correo_puerto
+                smtpServer.Host = correo_host
+                smtpServer.EnableSsl = correo_ssl
+                '
+                Dim mail As New MailMessage
+                mail.From = New MailAddress(correo_cuenta)
+                mail.To.Add(correo_cuenta)
+                traduccion(31) = Strings.Replace(traduccion(31), vbCrLf, "")
+                traduccion(31) = Strings.Replace(traduccion(31), vbCr, "")
+                traduccion(31) = Strings.Replace(traduccion(31), vbLf, "")
 
-            Dim mensajesDS As DataSet
-            Dim eMensaje = ""
-            Dim eTitulo = ""
-            Dim audiosGen = 0
-            Dim audiosNGen = 0
-            Dim mTotal = 0
-            'Escalada 4
-            Dim miError As String = ""
-            Dim optimizar As Boolean = False
-            Dim mantenerPrioridad As Boolean = False
-            Dim correo_titulo_falla As Boolean
-            Dim correo_titulo As String
-            Dim correo_cuerpo As String
-            Dim correo_firma As String
-            Dim correo_cuenta As String
-            Dim correo_puerto As String
-            Dim correo_ssl As Boolean
-            Dim correo_clave As String
-            Dim correo_host As String
-            Dim separador_mail As String
-            Dim mensajeGenerado As Boolean = False
-            Dim be_alarmas_correos As Boolean = False
-            Dim regsAfectados = 0
-            Dim registroDS As DataSet
+                mail.Subject = traduccion(31)
+                mail.Body = traduccion(31)
+                smtpServer.Send(mail)
+                mail.Dispose()
+                Dim regsAfectados = consultaACT("UPDATE " & rutaBD & ".configuracion SET correo_prueba = 'N', correo_respuesta = '" & Format(DateAndTime.Now, "yyyy-MMM-dd HH:mm:ss") & ": " & traduccion(28) & "'")
+                agregarLOG(traduccion(28), 9, 0)
+            Catch ex As Exception
+                Dim regsAfectados = consultaACT("UPDATE " & rutaBD & ".configuracion SET correo_prueba = 'N', correo_respuesta = '" & Format(DateAndTime.Now, "yyyy-MMM-dd HH:mm:ss") & ": " & traduccion(29) & ex.Message & "'")
+                agregarLOG(traduccion(29), 9, 0)
+            End Try
+        End If
+    End Sub
 
-            Dim canales As String = ""
-            Dim laLinea As String = ""
-            Dim laMaquina As String = ""
-            Dim laArea As String = ""
-            Dim laFalla As String = ""
-            Dim elLote As String = ""
-            Dim elProceso As String = ""
-            Dim laCarga As String = ""
-            Dim fecha
-            Dim tiempo As String = ""
-            Dim nroReporte As Integer = 0
+    Sub reporteOEEporTurno(secuencia As Long)
+        Dim cadSQL As String = "SELECT correo_cuenta, correo_clave, correo_puerto, correo_ssl, correo_host, oee_por_turno_cuentas FROM " & rutaBD & ".configuracion"
+        Dim readerDS As DataSet = consultaSEL(cadSQL)
+        Dim escape_mensaje = ""
+        If readerDS.Tables(0).Rows.Count > 0 Then
+            Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+            Dim correo_cuenta As String = ValNull(reader!correo_cuenta, "A")
+            Dim correo_clave As String = ValNull(reader!correo_clave, "A")
+            Dim correo_puerto = ValNull(reader!correo_puerto, "A")
+            Dim correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
+            Dim correo_host = ValNull(reader!correo_host, "A")
+            Dim listaCorreos = ValNull(reader!oee_por_turno_cuentas, "A")
+            Dim smtpServer As New SmtpClient()
 
-            Dim cadSQL As String = "SELECT * FROM " & rutaBD & ".configuracion"
-            Dim readerDS As DataSet = consultaSEL(cadSQL)
-            Dim escape_mensaje = ""
-            If readerDS.Tables(0).Rows.Count > 0 Then
-                Dim reader As DataRow = readerDS.Tables(0).Rows(0)
-                optimizar = ValNull(reader!optimizar_correo, "A") = "S"
-                be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
-                mantenerPrioridad = ValNull(reader!optimizar_mmcall, "A") = "S"
-                correo_titulo_falla = ValNull(reader!correo_titulo_falla, "A") = "S"
-                be_alarmas_correos = ValNull(reader!be_alarmas_correos, "A") = "S"
-                correo_titulo = ValNull(reader!correo_titulo, "A")
-                correo_cuerpo = ValNull(reader!correo_cuerpo, "A")
-                correo_firma = ValNull(reader!correo_firma, "A")
-                correo_cuenta = ValNull(reader!correo_cuenta, "A")
-                correo_clave = ValNull(reader!correo_clave, "A")
-                correo_puerto = ValNull(reader!correo_puerto, "A")
-                correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
-                escape_mensaje = ValNull(reader!escape_mensaje, "A")
-                correo_host = ValNull(reader!correo_host, "A")
-                separador_mail = ValNull(reader!separador_mail, "A")
+            Try
+                smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                smtpServer.Port = correo_puerto
+                smtpServer.Host = correo_host
+                smtpServer.EnableSsl = correo_ssl
+                '
+            Catch ex As Exception
+                Application.Exit()
+                Exit Sub
+            End Try
+
+            Dim correos As String()
+            Dim tempArray As String()
+            Dim totalItems = 0
+            If listaCorreos.Length > 0 Then
+                Dim arreCanales = listaCorreos.Split(New Char() {";"c})
+                For i = LBound(arreCanales) To UBound(arreCanales)
+                    'Redimensionamos el Array temporal y preservamos el valor  
+                    ReDim Preserve correos(totalItems + i)
+                    correos(totalItems + i) = arreCanales(i)
+                Next
+                tempArray = correos
+                totalItems = correos.Length
+
+                Dim x As Integer, y As Integer
+                Dim z As Integer
+
+                For x = 0 To UBound(correos)
+                    z = 0
+                    For y = 0 To UBound(correos) - 1
+                        'Si el elemento del array es igual al array temporal  
+                        If correos(x) = tempArray(z) And y <> x Then
+                            'Entonces Eliminamos el valor duplicado  
+                            correos(y) = ""
+                        End If
+                        z = z + 1
+                    Next y
+                Next x
             End If
-            If separador_mail = "" Then separador_mail = ";"
-            If correo_firma.Length = 0 Then
-                correo_firma = "Le agradecemos no responder a este correo, se envía desde una cuenta no supervisada."
-            End If
-            If correo_titulo.Length = 0 Then
-                correo_titulo = "SIGMA Monitor versión 1.0"
-            End If
 
-            If be_alarmas_correos Then
+            Dim mail As New MailMessage
 
-                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 2 AND estatus = 'A'")
+            Try
+                mail.From = New MailAddress(correo_cuenta)
+                For i = 0 To UBound(correos)
+                    If correos(i).Length > 0 Then
+                        mail.To.Add(correos(i))
+                    End If
+                Next i
 
-                If Not optimizar Then
-                    cadSQL = "SELECT a.id, 1 AS cuenta, b.evento FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id WHERE a.canal = 2 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
-                ElseIf mantenerPrioridad Then
-                    cadSQL = "SELECT a.prioridad, a.lista, c.evento, b.correos, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.canal = 2 AND a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, c.evento, b.correos ORDER BY prioridad DESC"
-                Else
-                    cadSQL = "SELECT a.lista, c.evento, b.correos, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.canal = 2 AND a.estatus = '" & idProceso & "' GROUP BY a.lista, c.evento, b.correos, 4"
-                End If
+                Dim CadenaMail = ""
+
+                CadenaMail = "SIGMA Reportes: OEE Turno anterior, resumen por máquina" & vbCrLf & vbCrLf
+
+                cadSQL = "SELECT c.turno, COUNT(*) AS tregs, COUNT(DISTINCT c.parte) AS tpartes, COUNT(DISTINCT c.orden) AS tordenes, a.nombre, c.dia, e.nombre AS tlinea, d.nombre AS tequipo, SUM(c.produccion) AS tpiezas, SUM(c.produccion_tc) AS tprod, SUM(c.calidad) AS trecha, SUM(c.calidad_tc) AS tcalidad, SUM(c.paro) AS tparo, SUM(c.tiempo_disponible) AS tdisp FROM " & rutaBD & ".lecturas_cortes c LEFT JOIN " & rutaBD & ".cat_turnos a ON c.turno = a.id LEFT JOIN " & rutaBD & ".cat_maquinas d ON c.equipo = d.id LEFT JOIN " & rutaBD & ".cat_lineas e ON d.linea = e.id WHERE c.turno_secuencia = " & secuencia & " GROUP BY c.dia, c.turno ORDER BY c.dia, c.turno, c.equipo"
+
                 'Se preselecciona la voz
-
-                mensajesDS = consultaSEL(cadSQL)
-                Dim generarMensaje As Boolean
+                Dim oeeTA = 0
+                Dim miTurno = ""
+                Dim mensajesDS As DataSet = consultaSEL(cadSQL)
                 If mensajesDS.Tables(0).Rows.Count > 0 Then
-                    Dim enlazado As Boolean = False
-                    Dim smtpServer As New SmtpClient()
+                    Dim totalParos = 0
+                    Dim totalProduccion = 0
+                    Dim totalCalidad = 0
+                    Dim totalDisponibilidad = 0
+                    Dim cabecera = False
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        If Not cabecera Then
+                            cabecera = True
+                            miTurno = ValNull(elmensaje!nombre, "A")
+                            CadenaMail = CadenaMail & "Fecha: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy") & " Turno: " & miTurno & vbCrLf & vbCrLf
+                        End If
+                        Dim rendimiento = 100
+                        Dim calidad = 100
+                        Dim disponibilidad = 100
+                        Dim oee = 0
 
-                    Try
-                        smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
-                        smtpServer.Port = correo_puerto
-                        smtpServer.Host = correo_host '"smtp.live.com" '"smtp.gmail.com"
-                        smtpServer.EnableSsl = correo_ssl
-                        enlazado = True
-                    Catch ex As Exception
-                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'A' WHERE canal = 2 AND estatus = '" & idProceso & "'")
-                        smtpServer.Dispose()
-                    End Try
-                    If enlazado Then
-                        For Each elmensaje In mensajesDS.Tables(0).Rows
-                            generarMensaje = False
-                            eMensaje = ""
-                            eTitulo = ""
-                            Dim cadWhere = "AND a.lista = " & elmensaje!lista
-                            If elmensaje!evento < 200 Then
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
-                                    eTitulo = "SIGMA Monitor v1.0: " & elmensaje!cuenta & " MENSAJE(S) POR ATENDER"
-                                    canales = ValNull(elmensaje!correos, "A")
-                                    laLinea = ""
-                                    laMaquina = ""
-                                    laArea = ""
-                                    laFalla = ""
-                                    tiempo = ""
-                                    generarMensaje = True
-                                    nroReporte = 0
+                        If elmensaje!tdisp - elmensaje!tparo > 0 Then
+                            rendimiento = elmensaje!tprod / (elmensaje!tdisp - elmensaje!tparo) * 100
+                        End If
+                        If elmensaje!tprod > 0 Then
+                            calidad = (1 - elmensaje!tcalidad / elmensaje!tprod) * 100
+                        End If
+                        If elmensaje!tdisp > 0 Then
+                            disponibilidad = (1 - elmensaje!tparo / elmensaje!tdisp) * 100
+                        End If
 
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
-                                    End If
-                                    cadSQL = "SELECT a.*, 0 AS rate, 0 AS oee, b.correos, e.nombre as nlinea, f.nombre as nmaquina, g.nombre as narea, h.nombre as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, d.fecha, d.inicio_atencion, d.inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".reportes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_lineas e ON d.linea = e.id LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.maquina = f.id LEFT JOIN " & rutaBD & ".cat_areas g ON d.area = g.id LEFT JOIN " & rutaBD & ".cat_fallas h ON d.falla = h.id WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.*, 0 AS rate, 0 AS oee, b.correos, e.nombre as nlinea, f.nombre as nmaquina, g.nombre as narea, h.nombre as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, d.fecha, d.inicio_atencion, d.inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".reportes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_lineas e ON d.linea = e.id LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.maquina = f.id LEFT JOIN " & rutaBD & ".cat_areas g ON d.area = g.id LEFT JOIN " & rutaBD & ".cat_fallas h ON d.falla = h.id WHERE a.id = " & elmensaje!id
-                                End If
-                            ElseIf elmensaje!evento > 200 And elmensaje!evento < 300 Then
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
-                                    eTitulo = "SIGMA Monitor v1.0: " & elmensaje!cuenta & " MENSAJE(S) POR ATENDER"
-                                    canales = ValNull(elmensaje!correos, "A")
-                                    laLinea = ""
-                                    laMaquina = ""
-                                    laArea = ""
-                                    laFalla = ""
-                                    tiempo = ""
-                                    generarMensaje = True
-                                    nroReporte = 0
+                        totalParos = totalParos + elmensaje!tparo
+                        totalProduccion = totalProduccion + elmensaje!tprod
+                        totalCalidad = totalCalidad + elmensaje!tcalidad
+                        totalDisponibilidad = totalDisponibilidad + elmensaje!tdisp
 
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
-                                    End If
-                                    cadSQL = "SELECT a.*, IF(d.rate_teorico > 0, d.rate / d.rate_teorico * 100, 0) AS rate, d.oee, b.correos, e.nombre as nlinea, f.nombre as nmaquina, '' as narea, '' as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, d.rate_tendencia_baja AS fecha, d.rate_tendencia_alta AS inicio_atencion, d.parada_desde AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".relacion_maquinas_lecturas d ON a.proceso = d.equipo LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.equipo = f.id LEFT JOIN " & rutaBD & ".cat_lineas e ON f.linea = e.id  WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.*, IF(d.rate_teorico > 0, d.rate / d.rate_teorico * 100, 0) AS rate, d.oee, b.correos, e.nombre as nlinea, f.nombre as nmaquina, '' as narea, '' as nfalla, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, d.rate_tendencia_baja AS fecha, d.rate_tendencia_alta AS inicio_atencion, d.parada_desde AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".relacion_maquinas_lecturas d ON a.proceso = d.equipo LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.equipo = f.id LEFT JOIN " & rutaBD & ".cat_lineas e ON f.linea = e.id WHERE a.id = " & elmensaje!id
-                                End If
-                            ElseIf elmensaje!evento = 302 Or elmensaje!evento = 303 Or elmensaje!evento = 305 Or elmensaje!evento = 306 Then
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
-                                    eTitulo = "SIGMA Monitor v1.0: " & elmensaje!cuenta & " MENSAJE(S) POR ATENDER"
-                                    canales = ValNull(elmensaje!correos, "A")
-                                    laLinea = ""
-                                    laMaquina = ""
-                                    laArea = ""
-                                    laFalla = ""
-                                    tiempo = ""
-                                    generarMensaje = True
-                                    nroReporte = 0
-
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
-                                    End If
-                                    cadSQL = "SELECT a.*, d.hasta, d.numero AS nlote, d.fecha, TIME_TO_SEC(TIMEDIFF(d.hasta, NOW())) AS previo, d.ruta_secuencia, c1.referencia, c1.nombre AS producto, IFNULL(b1.nombre, 'N/A') AS ruta_actual, IFNULL(e1.nombre, 'N/A') as equipo, IFNULL(d1.nombre, 'N/A') as nproceso, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".det_rutas b1 ON d.ruta_detalle = b1.id LEFT JOIN " & rutaBD & ".cat_partes c1 ON d.parte = c1.id LEFT JOIN " & rutaBD & ".cat_procesos d1 ON d.proceso = d1.id LEFT JOIN " & rutaBD & ".cat_maquinas e1 ON d.equipo= e1.id WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.*, d.hasta, d.numero AS nlote, d.fecha, TIME_TO_SEC(TIMEDIFF(d.hasta, NOW())) AS previo, d.ruta_secuencia, c1.referencia, c1.nombre AS producto, IFNULL(b1.nombre, 'N/A') AS ruta_actual, IFNULL(e1.nombre, 'N/A') as equipo, IFNULL(d1.nombre, 'N/A') as nproceso, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".det_rutas b1 ON d.ruta_detalle = b1.id LEFT JOIN " & rutaBD & ".cat_partes c1 ON d.parte = c1.id LEFT JOIN " & rutaBD & ".cat_procesos d1 ON d.proceso = d1.id LEFT JOIN " & rutaBD & ".cat_maquinas e1 ON d.equipo= e1.id WHERE a.id = " & elmensaje!id
-                                End If
-                            ElseIf elmensaje!evento = 301 Then
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
-                                    eTitulo = "SIGMA Monitor v1.0: " & elmensaje!cuenta & " MENSAJE(S) POR ATENDER"
-                                    canales = ValNull(elmensaje!correos, "A")
-                                    laLinea = ""
-                                    laMaquina = ""
-                                    laArea = ""
-                                    laFalla = ""
-                                    tiempo = ""
-                                    generarMensaje = True
-                                    nroReporte = 0
-
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
-                                    End If
-                                    cadSQL = "SELECT a.*, e1.referencia, e1.nombre AS producto, b1.numero AS nlote, IFNULL((SELECT MIN(orden) FROM " & rutaBD & ".prioridades WHERE parte = b1.parte AND fecha >= NOW() AND estatus = 'A'), 100) AS prioridad, d.ruta_secuencia, d.ruta_secuencia_antes, IFNULL(c1.nombre, 'N/A') AS ruta_antes, IFNULL(d1.nombre, 'N/A') AS ruta_despues, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS fecha, NOW() AS inicio_atencion, NOW() AS inicio_reporte, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes_historia d ON a.proceso = d.id INNER JOIN " & rutaBD & ".lotes b1 ON d.lote = b1.id LEFT JOIN " & rutaBD & ".det_rutas c1 ON d.ruta_detalle_anterior = c1.id LEFT JOIN " & rutaBD & ".det_rutas d1 ON d.ruta_detalle = d1.id LEFT JOIN " & rutaBD & ".cat_partes e1 ON b1.parte = e1.id WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.*, e1.referencia, e1.nombre AS producto, b1.numero AS nlote, IFNULL((SELECT MIN(orden) FROM " & rutaBD & ".prioridades WHERE parte = b1.parte AND fecha >= NOW() AND estatus = 'A'), 100) AS prioridad, d.ruta_secuencia, d.ruta_secuencia_antes, IFNULL(c1.nombre, 'N/A') AS ruta_antes, IFNULL(d1.nombre, 'N/A') AS ruta_despues, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS fecha, NOW() AS inicio_atencion, NOW() AS inicio_reporte, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".lotes_historia d ON a.proceso = d.id INNER JOIN " & rutaBD & ".lotes b1 ON d.lote = b1.id LEFT JOIN " & rutaBD & ".det_rutas c1 ON d.ruta_detalle_anterior = c1.id LEFT JOIN " & rutaBD & ".det_rutas d1 ON d.ruta_detalle = d1.id LEFT JOIN " & rutaBD & ".cat_partes e1 ON b1.parte = e1.id WHERE a.id = " & elmensaje!id
-                                End If
-                            ElseIf elmensaje!evento = 304 Or elmensaje!evento = 307 Then
-                                If elmensaje!cuenta > 1 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
-                                    If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                        eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
-                                    End If
-                                    eTitulo = "SIGMA Monitor v1.0: " & elmensaje!cuenta & " MENSAJE(S) POR ATENDER"
-                                    canales = ValNull(elmensaje!correos, "A")
-                                    laLinea = ""
-                                    laMaquina = ""
-                                    laArea = ""
-                                    laFalla = ""
-                                    tiempo = ""
-                                    generarMensaje = True
-                                    nroReporte = 0
-
-                                    If mantenerPrioridad Then
-                                        cadWhere = cadWhere & " AND a.prioridad = " & elmensaje!prioridad
-                                    End If
-                                    cadSQL = "SELECT a.*, 0 AS previo, d.carga, d.alarma, d.alarma_rep, d.fecha, d.permitir_reprogramacion, d.equipo, d.fecha, IFNULL(b1.nombre, 'N/A') as nequipo, IFNULL(c1.nombre, 'N/A') as nproceso, IFNULL((SELECT SUM(cantidad) FROM " & rutaBD & ".programacion WHERE carga = d.id AND estatus = 'A'), 0) AS piezas, (SELECT COUNT(*) FROM " & rutaBD & ".lotes WHERE carga = d.id) AS avance, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".cargas d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_maquinas b1 ON d.equipo = b1.id AND b1.estatus = 'A' LEFT JOIN " & rutaBD & ".cat_procesos c1 ON b1.proceso = c1.id AND c1.estatus = 'A' WHERE a.estatus = '" & idProceso & "' " & cadWhere
-                                Else
-                                    cadSQL = "SELECT a.*, 0 AS previo, d.carga, d.alarma, d.alarma_rep, d.fecha, d.permitir_reprogramacion, d.equipo, d.fecha, IFNULL(b1.nombre, 'N/A') as nequipo, IFNULL(c1.nombre, 'N/A') as nproceso, IFNULL((SELECT SUM(cantidad) FROM " & rutaBD & ".programacion WHERE carga = d.id AND estatus = 'A'), 0) AS piezas, (SELECT COUNT(*) FROM " & rutaBD & ".lotes WHERE carga = d.id) AS avance, b.correos, c.id AS idalerta, c.evento AS tipoalerta, c.resolucion_mensaje, c.cancelacion_mensaje, c.acumular, c.mensaje, c.titulo, i.inicio AS inicio_atencion, NOW() AS inicio_reporte, d.estatus, i.repeticiones, i.fase, i.escalamientos1, i.escalamientos2, i.escalamientos3, i.escalamientos4, i.escalamientos5 FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c ON a.alerta = c.id INNER JOIN " & rutaBD & ".alarmas i ON a.alarma = i.id LEFT JOIN " & rutaBD & ".cargas d ON a.proceso = d.id LEFT JOIN " & rutaBD & ".cat_maquinas b1 ON d.equipo = b1.id AND b1.estatus = 'A' LEFT JOIN " & rutaBD & ".cat_procesos c1 ON b1.proceso = c1.id AND c1.estatus = 'A' WHERE a.id = " & elmensaje!id
-                                End If
-                            End If
-
-                            Dim mensajeCorreo As String = ""
-                            registroDS = consultaSEL(cadSQL)
-                            Dim linCorreo = 0
-                            If registroDS.Tables(0).Rows.Count > 0 Then
-                                canales = ValNull(registroDS.Tables(0).Rows(0)!correos, "A")
-                                If canales.Length > 0 Then
-                                    generarMensaje = True
-                                    For Each elCorreo In registroDS.Tables(0).Rows
-                                        linCorreo = linCorreo + 1
-                                        nroReporte = elCorreo!proceso
-                                        generarMensaje = True
-                                        If elCorreo!tipoalerta < 300 Then
-                                            laLinea = ValNull(elCorreo!nlinea, "A")
-                                            laMaquina = ValNull(elCorreo!nmaquina, "A")
-                                            laArea = ValNull(elCorreo!narea, "A")
-                                            laFalla = ValNull(elCorreo!nfalla, "A")
-                                        Else
-                                            laLinea = ""
-                                            laMaquina = ""
-                                            laArea = ""
-                                            laFalla = ""
-                                        End If
-                                        If elCorreo!tipoalerta = 101 Or elCorreo!tipoalerta = 201 Or elCorreo!tipoalerta = 301 Then
-                                            fecha = elCorreo!fecha
-                                        ElseIf elCorreo!tipoalerta = 102 Or elCorreo!tipoalerta = 202 Or elCorreo!tipoalerta > 300 Then
-                                            fecha = elCorreo!inicio_atencion
-                                        ElseIf elCorreo!tipoalerta = 103 Or elCorreo!tipoalerta = 203 Then
-                                            fecha = elCorreo!inicio_reporte
-                                        End If
-                                        tiempo = calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, fecha, Now))
-                                        If elmensaje!cuenta <= 1 Then eTitulo = ValNull(elCorreo!titulo, "A")
-                                        If elCorreo!tipo = 0 Then
-                                            eMensaje = ValNull(elCorreo!mensaje, "A")
-                                        ElseIf elCorreo!tipo = 8 Then
-                                            eMensaje = ValNull(elCorreo!resolucion_mensaje, "A")
-                                        ElseIf elCorreo!tipo = 7 Then
-                                            eMensaje = ValNull(elCorreo!cancelacion_mensaje, "A")
-
-                                        Else
-                                            eMensaje = ValNull(elCorreo!mensaje, "A")
-                                        End If
-                                        If elmensaje!cuenta <= 1 Then eTitulo = eMensaje
-                                        If eTitulo.Length = 0 Then
-                                            eTitulo = ValNull(elCorreo!titulo, "A")
-                                        End If
-                                        If eTitulo.Length > 0 Then
-                                            eTitulo = Replace(eTitulo, "[0]", nroReporte)
-                                            eTitulo = Replace(eTitulo, "[1]", laLinea)
-                                            eTitulo = Replace(eTitulo, "[2]", laMaquina)
-                                            eTitulo = Replace(eTitulo, "[3]", laArea)
-                                            eTitulo = Replace(eTitulo, "[4]", laFalla)
-                                            eTitulo = Replace(eTitulo, "[5]", Format(fecha, "ddd, dd-MMM-yyyy HH:mm"))
-                                            eTitulo = Replace(eTitulo, "[11]", tiempo)
-                                            If elCorreo!tipoalerta <= 300 Then
-                                                eTitulo = Replace(eTitulo, "[12]", Format(elCorreo!rate, "0") & "%")
-                                                eTitulo = Replace(eTitulo, "[13]", Format(elCorreo!oee, "0") & "%")
-                                            End If
-
-                                            If ValNull(elCorreo!repeticiones, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[20]", "Repetición " & ValNull(elCorreo!repeticiones, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[20]", "")
-                                            End If
-                                            If ValNull(elCorreo!fase - 10, "N") > 0 Then
-                                                Dim escala = ValNull(elCorreo!fase, "N") - 10
-                                                eTitulo = Replace(eTitulo, "[30]", "Escalado al Nivel " & If(escala > 0, escala, 0))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[30]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos1, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[31]", "Repetición " & ValNull(elCorreo!escalamientos1, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[31]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos2, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[32]", "Repetición " & ValNull(elCorreo!escalamientos2, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[32]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos3, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[33]", "Repetición " & ValNull(elCorreo!escalamientos3, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[33]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos4, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[34]", "Repetición " & ValNull(elCorreo!escalamientos4, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[34]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos5, "N") > 0 Then
-                                                eTitulo = Replace(eTitulo, "[35]", "Repetición " & ValNull(elCorreo!escalamientos5, "N"))
-                                            Else
-                                                eTitulo = Replace(eTitulo, "[35]", "")
-                                            End If
-                                            eTitulo = Replace(eTitulo, "[90]", "")
-                                            eTitulo = Replace(eTitulo, System.Environment.NewLine, " ")
-
-                                            If elmensaje!evento = 301 Then
-                                                elLote = eTitulo = Replace(eTitulo, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eTitulo = Replace(eTitulo, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eTitulo = Replace(eTitulo, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eTitulo = Replace(eTitulo, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eTitulo = Replace(eTitulo, "[70]", ValNull(elCorreo!ruta_antes, "A"))
-                                                eTitulo = Replace(eTitulo, "[71]", ValNull(elCorreo!ruta_secuencia_antes, "A"))
-                                                eTitulo = Replace(eTitulo, "[72]", ValNull(elCorreo!ruta_despues, "A"))
-                                                eTitulo = Replace(eTitulo, "[73]", ValNull(elCorreo!ruta_secuencia, "A"))
-
-                                            ElseIf elmensaje!evento = 302 Or elmensaje!evento = 305 Then
-                                                eTitulo = Replace(eTitulo, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eTitulo = Replace(eTitulo, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eTitulo = Replace(eTitulo, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eTitulo = Replace(eTitulo, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eTitulo = Replace(eTitulo, "[44]", ValNull(elCorreo!ruta_actual, "A"))
-                                                eTitulo = Replace(eTitulo, "[45]", ValNull(elCorreo!ruta_secuencia, "A"))
-                                                eTitulo = Replace(eTitulo, "[50]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eTitulo = Replace(eTitulo, "[51]", Format(elCorreo!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                                eTitulo = Replace(eTitulo, "[52]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!hasta, DateAndTime.Now)))
-                                                eTitulo = Replace(eTitulo, "[83]", calcularTiempoCad(elCorreo!previo))
-                                            ElseIf elmensaje!evento = 303 Or elmensaje!evento = 306 Then
-                                                eTitulo = Replace(eTitulo, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eTitulo = Replace(eTitulo, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eTitulo = Replace(eTitulo, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eTitulo = Replace(eTitulo, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eTitulo = Replace(eTitulo, "[44]", ValNull(elCorreo!ruta_actual, "A"))
-                                                eTitulo = Replace(eTitulo, "[45]", ValNull(elCorreo!ruta_secuencia, "A"))
-                                                eTitulo = Replace(eTitulo, "[61]", ValNull(elCorreo!equipo, "A"))
-                                                eTitulo = Replace(eTitulo, "[62]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eTitulo = Replace(eTitulo, "[63]", Format(elCorreo!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                                eTitulo = Replace(eTitulo, "[64]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!hasta, DateAndTime.Now)))
-                                                eTitulo = Replace(eTitulo, "[83]", calcularTiempoCad(elCorreo!previo))
-                                            ElseIf elmensaje!evento = 304 Or elmensaje!evento = 307 Then
-                                                eTitulo = Replace(eTitulo, "[80]", ValNull(elCorreo!carga, "A"))
-                                                eTitulo = Replace(eTitulo, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eTitulo = Replace(eTitulo, "[61]", ValNull(elCorreo!nequipo, "A"))
-                                                eTitulo = Replace(eTitulo, "[81]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eTitulo = Replace(eTitulo, "[82]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!fecha, DateAndTime.Now)))
-                                                eTitulo = Replace(eTitulo, "[83]", calcularTiempoCad(elCorreo!previo))
-                                                eTitulo = Replace(eTitulo, "[84]", ValNull(elCorreo!texto, "A"))
-
-                                            End If
+                        oee = IIf(rendimiento > 100, 100, rendimiento) * calidad * disponibilidad / 10000
+                        CadenaMail = CadenaMail & "Máquina: " & ValNull(elmensaje!tequipo, "A") & "/" & ValNull(elmensaje!tlinea, "A") & vbCrLf & "Disponibilidad: " & disponibilidad.ToString("0.###") & "%" & vbCrLf & "Rendimiento: " & rendimiento.ToString("0.###") & "%" & vbCrLf & "Calidad: " & calidad.ToString("0.###") & "%" & vbCrLf & "OEE: " & oee.ToString("0.###") & "%" & vbCrLf
+                    Next
+                    Dim tRendimiento = 100
+                    Dim tCalidad = 100
+                    Dim tDisponibilidad = 100
+                    If totalDisponibilidad - totalParos > 0 Then
+                        tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
+                    End If
+                    If totalProduccion > 0 Then
+                        tCalidad = (1 - totalCalidad / totalProduccion) * 100
+                    End If
+                    If totalDisponibilidad > 0 Then
+                        tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
+                    End If
+                    oeeTA = IIf(tRendimiento > 100, 100, tRendimiento) * tCalidad * tDisponibilidad / 10000
+                    mail.Subject = "SIGMA Reporting OEE turno " & miTurno & ": " & oeeTA.ToString("0.###") & "%"
+                Else
+                    mail.Subject = "SIGMA Reporting OEE turno anterior: N/A"
+                    CadenaMail = CadenaMail & "No se encontró información para el reporte..."
+                End If
+                CadenaMail = CadenaMail & vbCrLf & vbCrLf & "Por favor no responda a este correo, se envía desde una cuenta no monirorizada..."
 
 
+                mail.Body = CadenaMail
+                smtpServer.Send(mail)
 
-                                        End If
+            Catch ex As Exception
 
+            Finally
+                mail.Dispose()
+            End Try
+            agregarLOG("Se envió el correo resumen de OEE", 9, 0)
+        End If
+    End Sub
 
-                                        If eMensaje.Length > 0 Then
-                                            eMensaje = Replace(eMensaje, "[0]", nroReporte)
-                                            eMensaje = Replace(eMensaje, "[1]", laLinea)
-                                            eMensaje = Replace(eMensaje, "[2]", laMaquina)
-                                            eMensaje = Replace(eMensaje, "[3]", laArea)
-                                            eMensaje = Replace(eMensaje, "[4]", laFalla)
-                                            eMensaje = Replace(eMensaje, "[5]", Format(fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                            eMensaje = Replace(eMensaje, "[11]", tiempo)
-                                            If elCorreo!tipoalerta < 300 Then
-                                                eMensaje = Replace(eMensaje, "[12]", Format(elCorreo!rate, "0") & "%")
-                                                eMensaje = Replace(eMensaje, "[13]", Format(elCorreo!oee, "0") & "%")
-                                            End If
-                                            If ValNull(elCorreo!repeticiones, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[20]", "Repetición " & ValNull(elCorreo!repeticiones, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[20]", "")
-                                            End If
-                                            If ValNull(elCorreo!fase - 10, "N") > 0 Then
-                                                Dim escala = ValNull(elCorreo!fase, "N") - 10
-                                                eMensaje = Replace(eMensaje, "[30]", "Escalado al Nivel " & If(escala > 0, escala, 0))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[30]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos1, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[31]", "Repetición " & ValNull(elCorreo!escalamientos1, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[31]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos2, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[32]", "Repetición " & ValNull(elCorreo!escalamientos2, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[32]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos3, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[33]", "Repetición " & ValNull(elCorreo!escalamientos3, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[33]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos4, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[34]", "Repetición " & ValNull(elCorreo!escalamientos4, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[34]", "")
-                                            End If
-                                            If ValNull(elCorreo!escalamientos5, "N") > 0 Then
-                                                eMensaje = Replace(eMensaje, "[35]", "Repetición " & ValNull(elCorreo!escalamientos5, "N"))
-                                            Else
-                                                eMensaje = Replace(eMensaje, "[35]", "")
-                                            End If
+    Sub reporteHoraxHora(tipo As Integer, secuencia As Long)
 
+        Dim cadSQL As String = "SELECT correo_cuenta, correo_clave, correo_puerto, correo_ssl, correo_host, oee_por_turno_cuentas_hxh, oee_por_turno_cuentas_hxh_turno, oee_por_turno_cuentas_hxh_dia, ruta_archivos_enviar FROM " & rutaBD & ".configuracion"
+        Dim readerDS As DataSet = consultaSEL(cadSQL)
+        Dim escape_mensaje = ""
 
-                                            If elmensaje!evento = 301 Then
-                                                elLote = ValNull(elCorreo!nlote, "A")
-                                                eMensaje = Replace(eMensaje, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eMensaje = Replace(eMensaje, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eMensaje = Replace(eMensaje, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eMensaje = Replace(eMensaje, "[70]", ValNull(elCorreo!ruta_antes, "A"))
-                                                eMensaje = Replace(eMensaje, "[71]", ValNull(elCorreo!ruta_secuencia_antes, "A"))
-                                                eMensaje = Replace(eMensaje, "[72]", ValNull(elCorreo!ruta_despues, "A"))
-                                                eMensaje = Replace(eMensaje, "[73]", ValNull(elCorreo!ruta_secuencia, "A"))
+        If readerDS.Tables(0).Rows.Count > 0 Then
+            Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+            Dim correo_cuenta As String = ValNull(reader!correo_cuenta, "A")
+            Dim correo_clave As String = ValNull(reader!correo_clave, "A")
+            Dim correo_puerto = ValNull(reader!correo_puerto, "A")
+            Dim correo_ssl = ValNull(reader!correo_ssl, "A") = "S"
+            Dim correo_host = ValNull(reader!correo_host, "A")
+            Dim listaCorreos = ValNull(reader!oee_por_turno_cuentas_hxh, "A")
+            Dim rutaFiles = ValNull(reader!ruta_archivos_enviar, "A")
+            If tipo = 2 Then
+                listaCorreos = ValNull(reader!oee_por_turno_cuentas_hxh_turno, "A")
+            ElseIf tipo = 3 Then
+                listaCorreos = ValNull(reader!oee_por_turno_cuentas_hxh_dia, "A")
+            End If
+            listaCorreos = "sistemas@cronosintegracion.com;elvismontezuma@hotmail.com"
+            Dim smtpServer As New SmtpClient()
 
-                                            ElseIf elmensaje!evento = 302 Or elmensaje!evento = 305 Then
-                                                elLote = ValNull(elCorreo!nlote, "A")
-                                                eMensaje = Replace(eMensaje, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eMensaje = Replace(eMensaje, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eMensaje = Replace(eMensaje, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eMensaje = Replace(eMensaje, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eMensaje = Replace(eMensaje, "[44]", ValNull(elCorreo!ruta_actual, "A"))
-                                                eMensaje = Replace(eMensaje, "[45]", ValNull(elCorreo!ruta_secuencia, "A"))
-                                                eMensaje = Replace(eMensaje, "[50]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eMensaje = Replace(eMensaje, "[51]", Format(elCorreo!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                                eMensaje = Replace(eMensaje, "[52]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!hasta, DateAndTime.Now)))
-                                                eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(elCorreo!previo))
-                                            ElseIf elmensaje!evento = 303 Or elmensaje!evento = 306 Then
-                                                elLote = ValNull(elCorreo!nlote, "A")
-                                                eMensaje = Replace(eMensaje, "[41]", ValNull(elCorreo!nlote, "A"))
-                                                eMensaje = Replace(eMensaje, "[42]", ValNull(elCorreo!referencia, "A"))
-                                                eMensaje = Replace(eMensaje, "[43]", ValNull(elCorreo!producto, "A"))
-                                                eMensaje = Replace(eMensaje, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eMensaje = Replace(eMensaje, "[44]", ValNull(elCorreo!ruta_actual, "A"))
-                                                eMensaje = Replace(eMensaje, "[45]", ValNull(elCorreo!ruta_secuencia, "A"))
-                                                eMensaje = Replace(eMensaje, "[61]", ValNull(elCorreo!equipo, "A"))
-                                                eMensaje = Replace(eMensaje, "[62]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eMensaje = Replace(eMensaje, "[63]", Format(elCorreo!hasta, "dd/MMM/yyyy HH:mm:ss"))
-                                                eMensaje = Replace(eMensaje, "[64]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!hasta, DateAndTime.Now)))
-                                                eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(elCorreo!previo))
-                                            ElseIf elmensaje!evento = 304 Or elmensaje!evento = 307 Then
-                                                laCarga = ValNull(elCorreo!carga, "A")
-                                                eMensaje = Replace(eMensaje, "[80]", ValNull(elCorreo!carga, "A"))
-                                                eMensaje = Replace(eMensaje, "[40]", ValNull(elCorreo!nproceso, "A"))
-                                                eMensaje = Replace(eMensaje, "[61]", ValNull(elCorreo!nequipo, "A"))
-                                                eMensaje = Replace(eMensaje, "[81]", Format(elCorreo!fecha, "dd/MMM/yyyy HH:mm:ss"))
-                                                eMensaje = Replace(eMensaje, "[82]", calcularTiempoCad(DateAndTime.DateDiff(DateInterval.Second, elCorreo!fecha, DateAndTime.Now)))
-                                                eMensaje = Replace(eMensaje, "[83]", calcularTiempoCad(elCorreo!previo))
-                                                eMensaje = Replace(eMensaje, "[84]", ValNull(elCorreo!texto, "A"))
+            If rutaFiles.Length = 0 Then
+                rutaFiles = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            Else
+                rutaFiles = Strings.Replace(rutaFiles, "/", "\")
+            End If
+            If Not My.Computer.FileSystem.DirectoryExists(rutaFiles) Then
+                Try
+                    My.Computer.FileSystem.CreateDirectory(rutaFiles)
+                Catch ex As Exception
+                    rutaFiles = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                End Try
+            End If
 
-                                            End If
+            Try
+                smtpServer.Credentials = New Net.NetworkCredential(correo_cuenta, correo_clave)
+                smtpServer.Port = correo_puerto
+                smtpServer.Host = correo_host
+                smtpServer.EnableSsl = correo_ssl
+                '
+            Catch ex As Exception
+                Application.Exit()
+                Exit Sub
+            End Try
+            Dim correos As String()
+            Dim tempArray As String()
+            Dim totalItems = 0
+            If listaCorreos.Length > 0 Then
+                Dim arreCanales = listaCorreos.Split(New Char() {";"c})
+                For i = LBound(arreCanales) To UBound(arreCanales)
+                    'Redimensionamos el Array temporal y preservamos el valor  
+                    ReDim Preserve correos(totalItems + i)
+                    correos(totalItems + i) = arreCanales(i)
+                Next
+                tempArray = correos
+                totalItems = correos.Length
 
+                Dim x As Integer, y As Integer
+                Dim z As Integer
 
-                                        Else
-                                            eMensaje = correo_cuerpo
-                                        End If
-                                        eMensaje = Replace(eMensaje, "[90]", vbCrLf)
-                                        If eMensaje.Length = 0 Then
-                                            eMensaje = " Este mensaje es enviado desde SIGMA Monitor" & vbCrLf
-                                            If elCorreo!tipoalerta = 101 Then
-                                                eMensaje = eMensaje & "El reporte " & nroReporte & " ha excedido el tiempo de espera por atención " & tiempo
-                                            ElseIf elCorreo!tipoalerta = 102 Then
-                                                eMensaje = eMensaje & "El reporte " & nroReporte & " ha excedido el tiempo de la reparación " & tiempo
-                                            ElseIf elCorreo!tipoalerta = 103 Then
-                                                eMensaje = eMensaje & "El reporte " & nroReporte & " ha excedido el tiempo de espera por la generación del informe " & tiempo
-                                            ElseIf elCorreo!tipoalerta = 201 Then
-                                                eMensaje = eMensaje & "El equipo " & laMaquina & " presenta bajo rate " & tiempo
-                                            ElseIf elCorreo!tipoalerta = 202 Then
-                                                eMensaje = eMensaje & "El equipo " & laMaquina & " presenta sobre rate " & tiempo
-                                            ElseIf elCorreo!tipoalerta = 203 Then
-                                                eMensaje = eMensaje & "El equipo " & laMaquina & " no está detectando piezas" & tiempo
-                                            ElseIf elCorreo!tipoalerta = 301 Then
-                                                eMensaje = eMensaje & "El lote " & elLote & " presentó un salto de operación" & tiempo
-                                            ElseIf elCorreo!tipoalerta = 302 Then
-                                                eMensaje = eMensaje & "El lote " & elLote & " presentó tiempo de stock excedido" & tiempo
-                                            ElseIf elCorreo!tipoalerta = 303 Then
-                                                eMensaje = eMensaje & "El lote " & elLote & " presentó tiempo de proceso excedido" & tiempo
-                                            ElseIf elCorreo!tipoalerta = 3043 Then
-                                                eMensaje = eMensaje & "La carga de programación " & laCarga & " presentó fecha de promesa excedida" & tiempo
-                                            End If
-                                            agregarLOG("La alerta " & elCorreo!idalerta & " no tiene un mensaje de correos definido se tomó el mensaje por defecto", nroReporte, 2)
-                                        End If
-                                        If elmensaje!cuenta > 1 Then
-                                            If linCorreo = 1 Then
-                                                mensajeCorreo = "Mensaje " & linCorreo & " de " & elmensaje!cuenta & vbCrLf
-                                            Else
-                                                mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & "Mensaje " & linCorreo & " de " & elmensaje!cuenta & vbCrLf
-                                            End If
-                                        End If
-                                        mensajeCorreo = mensajeCorreo & eMensaje & vbCrLf
-                                    Next
-                                    If eTitulo.Length = 0 Then
-                                        eTitulo = correo_titulo
-                                    End If
-                                    mensajeCorreo = mensajeCorreo & vbCrLf & vbCrLf & correo_firma
+                For x = 0 To UBound(correos)
+                    z = 0
+                    For y = 0 To UBound(correos) - 1
+                        'Si el elemento del array es igual al array temporal  
+                        If correos(x) = tempArray(z) And y <> x Then
+                            'Entonces Eliminamos el valor duplicado  
+                            correos(y) = ""
+                        End If
+                        z = z + 1
+                    Next y
+                Next x
+            End If
+
+            Dim mail As New MailMessage
+
+            Try
+                mail.From = New MailAddress(correo_cuenta)
+                For i = 0 To UBound(correos)
+                    If correos(i).Length > 0 Then
+                        mail.To.Add(correos(i))
+                    End If
+                Next i
+
+                Dim cadTitulos = "Secuencia,Ruptura,Fecha,Equipo/Máquina,Orden/Lote,Número de parte,Turno,Hora,Inicia,Termina,Tiempo disponible efectivo,Tiempo de paro efectivo,Tiempo ciclo estimado (seg),Plan,Acumulado,Piezas OK,Piezas No OK,Producción (OK y no OK),Diferencia (Plan versus real),Adherencia al plan (%),Producción de la hora anterior,Rendimiento (OEE),Calidad (OEE),Disponibilidad (OEE),OEE,Tiempo ciclo real (seg),Diferencia en la hora anterior,Plan automatico (S/N),Tripulación,Comentarios,Causa principal de la desviación (si aplica),Responsable de la desviación (1),Responsable de la desviación (2)"
+
+                Dim CadenaMail = ""
+                Dim horaAnterior = DateAdd(DateInterval.Hour, -1, Now())
+                Dim diaAnterior = DateAdd(DateInterval.Day, -1, Now())
+                Dim archivoEnv = "reporteOEE_turno"
+                If tipo = 1 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)" & vbCrLf & vbCrLf
+                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.secuencia = " & secuencia & " ORDER BY a.dia, a.hora, a.id"
+                ElseIf tipo = 2 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por hora)" & vbCrLf & vbCrLf
+                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(horaAnterior, "yyyy/MM/dd") & "' AND hora = " & Val(Format(horaAnterior, "HH")) & " ORDER BY a.dia, a.hora, a.id"
+                    archivoEnv = "reporteOEE_hora"
+                ElseIf tipo = 3 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por día)" & vbCrLf & vbCrLf
+                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(diaAnterior, "yyyy/MM/dd") & "' ORDER BY a.dia, a.hora, a.id"
+                    archivoEnv = "reporteOEE_dia"
+                End If
+
+                'Se preselecciona la voz
+                Try
+                    File.Delete(rutaFiles & "\" & archivoEnv & ".csv")
+                    File.Delete(rutaFiles & "\" & archivoEnv & ".csv")
 
 
-                                    If correo_titulo_falla And elmensaje!cuenta <= 1 And laFalla.Length > 0 Then
-                                        eTitulo = "SIGMA Monitor v1.0 " & Format(fecha, "dd/MMM/yyyy HH:mm:ss") & " " & laMaquina & " " & laFalla & " (Van: " & tiempo & ")"
-                                    End If
-                                End If
-                            End If
+                Catch ex As Exception
 
-                            If generarMensaje And canales.Length > 0 Then
-                                Dim correos As String()
-                                Dim tempArray As String()
-                                Dim totalItems = 0
-                                If canales.Length > 0 Then
-                                    Dim arreCanales = canales.Split(New Char() {";"c})
-                                    For i = LBound(arreCanales) To UBound(arreCanales)
-                                        'Redimensionamos el Array temporal y preservamos el valor  
-                                        ReDim Preserve correos(totalItems + i)
-                                        correos(totalItems + i) = arreCanales(i)
-                                    Next
-                                    tempArray = correos
-                                    totalItems = correos.Length
+                End Try
 
-                                    Dim x As Integer, y As Integer
-                                    Dim z As Integer
+                Dim totalParos = 0
+                Dim totalProduccion = 0
+                Dim totalCalidad = 0
+                Dim totalDisponibilidad = 0
 
-                                    For x = 0 To UBound(correos)
-                                        z = 0
-                                        For y = 0 To UBound(correos) - 1
-                                            'Si el elemento del array es igual al array temporal  
-                                            If correos(x) = tempArray(z) And y <> x Then
-                                                'Entonces Eliminamos el valor duplicado  
-                                                correos(y) = ""
-                                            End If
-                                            z = z + 1
-                                        Next y
-                                    Next x
-                                End If
-                                mensajeGenerado = False
-                                Dim mail As New MailMessage
-                                Try
-                                    mail.From = New MailAddress(correo_cuenta)
-                                    For i = 0 To UBound(correos)
-                                        If correos(i).Length > 0 Then
-                                            mail.To.Add(correos(i))
-                                        End If
-                                    Next i
+                Dim ttotalParos = 0
+                Dim ttotalProduccion = 0
+                Dim ttotalCalidad = 0
+                Dim ttotalDisponibilidad = 0
 
-                                    mail.Subject = eTitulo
-                                    mail.Body = mensajeCorreo
-                                    smtpServer.Send(mail)
-                                    audiosGen = audiosGen + 1
-                                    mensajeGenerado = True
-                                Catch ex As Exception
-                                    audiosNGen = audiosNGen + 1
-                                    agregarLOG(ex.Message, 9, nroReporte)
-                                Finally
-                                    mail.Dispose()
-                                End Try
-                                cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
-                                If optimizar Then
-                                    If elmensaje!cuenta > 1 Then
-                                        cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE canal = 2 AND lista = " & elmensaje!lista & " AND estatus = '" & idProceso & "'"
-                                        If mantenerPrioridad Then
-                                            cadSQL = cadSQL & " AND prioridad = " & elmensaje!prioridad
-                                        End If
-                                    End If
-                                End If
-                                regsAfectados = consultaACT(cadSQL)
-                            End If
-                        Next
-                        cadSQL = "SELECT a.id, a.texto, b.correos FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' WHERE a.alerta = 0 AND a.canal = 2 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
-                        mensajesDS = consultaSEL(cadSQL)
-                        generarMensaje = False
-                        If mensajesDS.Tables(0).Rows.Count > 0 Then
-                            For Each elmensaje In mensajesDS.Tables(0).Rows
-                                canales = ValNull(elmensaje!correos, "A")
-                                eMensaje = "Se agotó el número de intentos de llamada para el teléfono " & ValNull(elmensaje!texto, "A")
-                                If canales.Length > 0 Then
-                                    Dim arreCanales = canales.Split(New Char() {";"c})
-                                    Dim correos As String()
-                                    Dim tempArray As String()
-                                    Dim totalItems = 0
+                Dim requiereResumen = False
 
-                                    For i = LBound(arreCanales) To UBound(arreCanales)
-                                        'Redimensionamos el Array temporal y preservamos el valor  
-                                        ReDim Preserve correos(totalItems + i)
-                                        correos(totalItems + i) = arreCanales(i)
-                                    Next
-                                    tempArray = correos
-                                    totalItems = correos.Length
+                Dim thDesde
+                Dim thHasta
 
-                                    Dim x As Integer, y As Integer
-                                    Dim z As Integer
+                Dim tplan = 0
+                Dim treal = 0
+                Dim ttMalas = 0
 
-                                    For x = 0 To UBound(correos)
-                                        z = 0
-                                        For y = 0 To UBound(correos) - 1
-                                            'Si el elemento del array es igual al array temporal  
-                                            If correos(x) = tempArray(z) And y <> x Then
-                                                'Entonces Eliminamos el valor duplicado  
-                                                correos(y) = ""
-                                            End If
-                                            z = z + 1
-                                        Next y
-                                    Next x
-                                    mensajeGenerado = False
-                                    Dim mail As New MailMessage
-                                    Try
-                                        mail.From = New MailAddress(correo_cuenta)
-                                        For i = 0 To UBound(correos)
-                                            If correos(i).Length > 0 Then
-                                                mail.To.Add(correos(i))
-                                            End If
-                                        Next i
 
-                                        mail.Subject = eMensaje
-                                        mail.Body = eMensaje
-                                        smtpServer.Send(mail)
-                                        audiosGen = audiosGen + 1
-                                        mensajeGenerado = True
-                                    Catch ex As Exception
-                                        audiosNGen = audiosNGen + 1
-                                        agregarLOG(ex.Message, 9, nroReporte)
-                                    Finally
-                                        mail.Dispose()
-                                    End Try
-                                End If
-                                If mensajeGenerado Then
-                                    cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
-                                    regsAfectados = consultaACT(cadSQL)
-                                End If
-                            Next
-                            If audiosGen > 0 Or audiosNGen > 0 Then
-                                agregarLOG("Se generaron " & audiosGen & " audio(s) y no se generaron " & audiosNGen & " audio(s)")
+                Dim cabecera = False
+
+                Dim linea As Integer = 0
+
+                Dim objWriter As New System.IO.StreamWriter(rutaFiles & "\" & archivoEnv & ".csv", False, System.Text.Encoding.UTF8)
+                If tipo = 1 Then
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)")
+                ElseIf tipo = 2 Then
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por hora)")
+                ElseIf tipo = 3 Then
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por día)")
+                End If
+                objWriter.WriteLine("Generado en: " & Format(Now(), "ddd dd-MMM-yyyy HH:mm:ss"))
+                objWriter.WriteLine(cadTitulos)
+                Dim oeeTA = 0
+                Dim miTurno = ""
+                Dim mensajesDS As DataSet = consultaSEL(cadSQL)
+                If mensajesDS.Tables(0).Rows.Count > 0 Then
+
+
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        linea = linea + 1
+                        If Not cabecera Then
+                            cabecera = True
+                            If tipo = 1 Then
+                                CadenaMail = CadenaMail & "Fecha: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy") & " Turno: " & ValNull(elmensaje!nturno, "A") & vbCrLf
+                            ElseIf tipo = 2 Then
+                                CadenaMail = CadenaMail & "Fecha: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy") & " Hora: " & Format(elmensaje!hora, "00") & vbCrLf
+                            ElseIf tipo = 3 Then
+                                CadenaMail = CadenaMail & "Fecha: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy") & vbCrLf
                             End If
                         End If
+                        Dim rendimiento = 100
+                        Dim calidad = 100
+                        Dim disponibilidad = 100
+                        Dim oee = 0
+
+                        If elmensaje!tiempo2 - elmensaje!paro2 > 0 Then
+                            rendimiento = (elmensaje!buenas_tc + elmensaje!malas_tc) / (elmensaje!tiempo2 - elmensaje!paro2) * 100
+                        End If
+                        If elmensaje!buenas_tc + elmensaje!malas_tc > 0 And elmensaje!malas_tc Then
+                            calidad = (1 - elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc)) * 100
+                        End If
+                        Dim tcReal As Double = elmensaje!tc
+                        If elmensaje!tiempo2 > 0 Then
+                            disponibilidad = (1 - elmensaje!paro2 / elmensaje!tiempo2) * 100
+                            tcReal = (elmensaje!buenas + elmensaje!malas) / elmensaje!tiempo2
+                        End If
+                        totalParos = totalParos + elmensaje!paro2
+                        totalProduccion = totalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        totalCalidad = totalCalidad + elmensaje!malas_tc
+                        totalDisponibilidad = totalDisponibilidad + elmensaje!tiempo2
+                        Dim adherencia = 0
+                        If elmensaje!plan > 0 Then
+                            adherencia = (elmensaje!malas + elmensaje!buenas) / elmensaje!plan * 100
+                        End If
+                        oee = IIf(rendimiento > 100, 100, rendimiento) * calidad * disponibilidad / 10000
+                        Dim cadReporte = linea & "," & Chr(34) & IIf(elmensaje!ruptura = 0, "Hora", IIf(elmensaje!ruptura = 1, "Turno", IIf(elmensaje!ruptura = 2, "Día", IIf(elmensaje!ruptura = 3, "Número de parte", IIf(elmensaje!ruptura = 4, "Número de lote/Orden", "Tiempo Ciclo"))))) & Chr(34) & "," & Chr(34) & Format(elmensaje!dia, "dd-MMM-yyyy") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nequipo, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!numero, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nparte, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nturno, "A") & Chr(34) & "," & Chr(34) & elmensaje!hora & Chr(34) & "," & Chr(34) & elmensaje!desde & Chr(34) & "," & Chr(34) & elmensaje!hasta & Chr(34) & "," & Chr(34) & elmensaje!tiempo2 & Chr(34) & "," & Chr(34) & elmensaje!paro2 & Chr(34) & "," & Chr(34) & elmensaje!tc & Chr(34) & "," & Chr(34) & elmensaje!plan & Chr(34) & "," & Chr(34) & elmensaje!plan_van & Chr(34) & "," & Chr(34) & elmensaje!buenas & Chr(34) & "," & Chr(34) & elmensaje!malas & Chr(34) & "," & Chr(34) & (elmensaje!malas + elmensaje!buenas) & Chr(34) & "," & Chr(34) & (elmensaje!plan - elmensaje!buenas - elmensaje!malas) * -1 & Chr(34) & "," & Chr(34) & adherencia & Chr(34) & "," & Chr(34) & (elmensaje!buenas_vienen + elmensaje!malas_vienen) & Chr(34) & "," & Chr(34) & rendimiento & Chr(34) & "," & Chr(34) & calidad & Chr(34) & "," & Chr(34) & disponibilidad & Chr(34) & "," & Chr(34) & oee & Chr(34) & "," & Chr(34) & tcReal & Chr(34) & "," & Chr(34) & elmensaje!diferencia_vienen & Chr(34) & "," & Chr(34) & IIf(elmensaje!tipo = 0, "No", "Si") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ntripulacion, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!comentarios, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ncausa, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp1, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp2, "A") & Chr(34)
+                        objWriter.WriteLine(cadReporte)
+                    Next
+
+
+                    Dim tRendimiento = 100
+                    Dim tCalidad = 100
+                    Dim tDisponibilidad = 100
+                    If totalDisponibilidad - totalParos > 0 Then
+                        tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
                     End If
-                    If audiosGen > 0 Or audiosNGen > 0 Then
-                        agregarLOG("Se generaron " & audiosGen & " correo(s) y no se generaron " & audiosNGen & " correo(s)")
+                    If totalProduccion > 0 Then
+                        tCalidad = (1 - totalCalidad / totalProduccion) * 100
                     End If
-                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = 'Z' WHERE canal = 2 AND estatus = '" & idProceso & "'")
-                    smtpServer.Dispose()
+                    If totalDisponibilidad > 0 Then
+                        tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
+                    End If
+                    oeeTA = IIf(tRendimiento > 100, 100, tRendimiento) * tCalidad * tDisponibilidad / 10000
+                    If tipo = 1 Then
+                        mail.Subject = "SIGMA Reportes Hora por hora (corte al turno) " & miTurno & ": " & oeeTA.ToString("0.###") & "%"
+
+                    ElseIf tipo = 2 Then
+                        mail.Subject = "SIGMA Reportes Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": " & oeeTA.ToString("0.###") & "%"
+
+                    ElseIf tipo = 3 Then
+                        mail.Subject = "SIGMA Reportes Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": " & oeeTA.ToString("0.###") & "%"
+
+                    End If
+                    agregarLOG("Se envió el correo resumen de OEE", 9, 0)
+                Else
+                    If tipo = 1 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte al turno) " & miTurno & ": Sin información"
+
+                    ElseIf tipo = 2 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": Sin información"
+
+                    ElseIf tipo = 3 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": Sin información"
+
+                    End If
+                    CadenaMail = CadenaMail & "No se encontró información para el reporte..."
+                    objWriter.WriteLine("No se encontró informacion para el reporte...")
+                    agregarLOG("No habían datos para enviar el correo resumen de OEE", 9, 0)
+
                 End If
-            End If
+                CadenaMail = CadenaMail & vbCrLf & vbCrLf & "Por favor no responda a este correo, se envía desde una cuenta no monitoreada..."
+                objWriter.WriteLine("FIn del reporte...")
+                objWriter.Close()
+
+
+                Dim archivo As Attachment = New Attachment(rutaFiles & "\" & archivoEnv & ".csv")
+                mail.Attachments.Add(archivo)
+
+                ''''Construcción del mail
+                If tipo = 1 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)" & vbCrLf & vbCrLf
+                    cadSQL = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.secuencia = " & secuencia & " GROUP BY a.equipo, a.dia, a.hora"
+                ElseIf tipo = 2 Then
+                    CadenaMail = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(horaAnterior, "yyyy/MM/dd") & "' AND hora = " & Val(Format(horaAnterior, "HH")) & " GROUP BY a.equipo, a.dia, a.hora"
+                    archivoEnv = "reporteOEE_hora"
+                ElseIf tipo = 3 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por día)" & vbCrLf & vbCrLf
+                    cadSQL = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(diaAnterior, "yyyy/MM/dd") & "' GROUP BY a.equipo, a.dia, a.hora"
+                    archivoEnv = "reporteOEE_dia"
+                End If
+
+                Dim myBuilder As System.Text.StringBuilder = New System.Text.StringBuilder()
+
+                myBuilder.Append("<html xmlns='http://www.w3.org/1999/xhtml'>")
+                myBuilder.Append("<head>")
+                myBuilder.Append("</head>")
+                myBuilder.Append("<body>")
+                If tipo = 1 Then
+                    myBuilder.Append("SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)")
+                ElseIf tipo = 2 Then
+                    myBuilder.Append("SIGMA Reportes: Resumen del Hora por hora (Corte por hora)")
+                ElseIf tipo = 3 Then
+                    myBuilder.Append("SIGMA Reportes: Resumen del Hora por hora (Corte por día)")
+                End If
+
+                totalParos = 0
+                totalProduccion = 0
+                totalCalidad = 0
+                totalDisponibilidad = 0
+
+                mensajesDS = consultaSEL(cadSQL)
+                If mensajesDS.Tables(0).Rows.Count > 0 Then
+
+                    cabecera = False
+                    linea = 0
+                    Dim plan = 0
+                    Dim real = 0
+                    Dim tMalas = 0
+
+                    Dim hDesde
+                    Dim hHasta
+                    Dim equipoActual = mensajesDS.Tables(0).Rows(0)!equipo
+
+
+                    myBuilder.Append("<table border='1px' cellpadding='5' cellspacing='0' ")
+                    myBuilder.Append("style='border: solid 1px DarkGray; font-size: x-medium;'>")
+
+                    hDesde = mensajesDS.Tables(0).Rows(0)!desde
+                    thDesde = mensajesDS.Tables(0).Rows(0)!desde
+
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        If equipoActual <> elmensaje!equipo Then
+                            requiereResumen = True
+                            cabecera = False
+                            equipoActual = elmensaje!equipo
+                            'Cabecera
+                            '
+                            If linea > 1 Then
+                                Dim tRendimiento = 100
+                                Dim tCalidad = 100
+                                Dim tScrap = 0
+                                Dim tParos = 0
+                                linea = 0
+                                Dim tDisponibilidad = 100
+                                If totalDisponibilidad - totalParos <> 0 Then
+                                    tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
+                                End If
+                                If totalProduccion > 0 Then
+                                    tCalidad = (1 - totalCalidad / totalProduccion) * 100
+                                    tScrap = totalCalidad / totalProduccion * 100
+                                End If
+                                If totalDisponibilidad > 0 Then
+                                    tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
+                                    tParos = totalParos / totalDisponibilidad * 100
+                                End If
+                                oeeTA = IIf(tRendimiento > 100, 100, tRendimiento) * tCalidad * tDisponibilidad / 10000
+
+                                myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
+
+                                myBuilder.Append("<td align='center' valign='top'>")
+                                myBuilder.Append(Left(hDesde, 5) & " " & Left(hHasta, 5))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(IIf(totalDisponibilidad > 0, calcularTiempoCad(totalDisponibilidad), "0"))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top'>")
+                                myBuilder.Append(Math.Round(plan, 0))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top'>")
+                                myBuilder.Append(Math.Round(plan))
+                                myBuilder.Append("</td>")
+                                '
+                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(real))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(real))
+                                myBuilder.Append("</td>")
+                                '''
+                                myBuilder.Append("<td align='center' valign='top'>")
+                                myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(tMalas))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(tScrap, 0) & "%")
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top'>")
+                                myBuilder.Append(IIf(totalParos > 0, calcularTiempoCad(totalParos), "0"))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top'>")
+                                myBuilder.Append(Math.Round(tParos, 0) & "%")
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(oeeTA, 0))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='center' valign='top'>")
+                                myBuilder.Append("")
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("</tr>")
+                            End If
+                            totalParos = 0
+                            totalProduccion = 0
+                            totalCalidad = 0
+                            totalDisponibilidad = 0
+                            linea = 0
+                        End If
+                        linea = linea + 1
+                        If Not cabecera Then
+                            cabecera = True
+                            If hDesde < elmensaje!desde Then
+                                hDesde = elmensaje!desde
+                            End If
+                            myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border: solid 1px DarkGray;font-weight: 600'>")
+                            '''
+                            myBuilder.Append("<td align='left' valign='top' colspan='6' style='border:solid 1px DarkGray'>")
+                                myBuilder.Append("LINEA: " & ValNull(elmensaje!nequipo, "A"))
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='left' valign='top' colspan='7'style='border:solid 1px DarkGray'>")
+                                myBuilder.Append("DÍA: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy"))
+                                myBuilder.Append("</td>")
+                                '''
+                                myBuilder.Append("</tr>")
+
+                                myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border: solid 1px DarkGray;font-weight: 600'>")
+                                '''
+                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                                myBuilder.Append("HORA")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
+                                myBuilder.Append("DISPONIBLE")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                                myBuilder.Append("(A) PIEZAS/OBJETIVO")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
+                                myBuilder.Append("(B) PIEZAS REALES")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                                myBuilder.Append("EFICIENCIA (B/A)")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='background-color:#D6DBDF'>")
+                                myBuilder.Append("(C) SCRAP")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                                myBuilder.Append("TIEMPO PARO (D)")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
+                                myBuilder.Append("OEE")
+                                myBuilder.Append("</td>")
+                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                                myBuilder.Append("COMENTARIOS")
+                                myBuilder.Append("</td>")
+                                '''
+                                myBuilder.Append("</tr>")
+                            End If
+                            Dim rendimiento = 100
+                        Dim hayRendimiento = False
+                        Dim calidad = 100
+                        Dim scrap = 0
+                        Dim paros = 0
+                        Dim disponibilidad = 100
+                        Dim haydisponibilidad = False
+                        Dim oee = 0
+
+                        If elmensaje!tiempo2 - elmensaje!paro2 > 0 Then
+                            rendimiento = (elmensaje!buenas_tc + elmensaje!malas_tc) / (elmensaje!tiempo2 - elmensaje!paro2) * 100
+                            hayRendimiento = True
+                        End If
+                        If elmensaje!buenas_tc + elmensaje!malas_tc > 0 And elmensaje!malas_tc > 0 Then
+                            calidad = (1 - elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc)) * 100
+                            scrap = elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc) * 100
+                        End If
+                        If elmensaje!tiempo2 > 0 Then
+                            disponibilidad = (1 - elmensaje!paro2 / elmensaje!tiempo2) * 100
+                            haydisponibilidad = True
+                            paros = elmensaje!paro2 / elmensaje!tiempo2 * 100
+                        End If
+                        totalParos = totalParos + elmensaje!paro2
+                        totalProduccion = totalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        totalCalidad = totalCalidad + elmensaje!malas_tc
+                        totalDisponibilidad = totalDisponibilidad + elmensaje!tiempo2
+                        '''
+                        ttotalParos = ttotalParos + elmensaje!paro2
+                        ttotalProduccion = ttotalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        ttotalCalidad = ttotalCalidad + elmensaje!malas_tc
+                        ttotalDisponibilidad = ttotalDisponibilidad + elmensaje!tiempo2
+                        '''
+                        Dim adherencia = 0
+                        If elmensaje!plan > 0 Then
+                            adherencia = (elmensaje!malas + elmensaje!buenas) / elmensaje!plan * 100
+                        End If
+                        oee = IIf(rendimiento > 100, 100, rendimiento) * calidad * disponibilidad / 10000
+
+                        tMalas = tMalas + elmensaje!malas
+                        ttMalas = ttMalas + elmensaje!malas
+
+                        'Linea
+                        If linea Mod 2 = 0 Then
+                            myBuilder.Append("<tr align='left' valign='top' style='background-color:AliceBlue;'>")
+                        Else
+                            myBuilder.Append("<tr align='left' valign='top' style='background-color:none;'>")
+
+                        End If
+
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Left(elmensaje!desde, 5) & " " & Left(elmensaje!hasta, 5))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(IIf(elmensaje!tiempo2 > 0, calcularTiempoCad(elmensaje!tiempo2), "0"))
+                        myBuilder.Append("</td>")
+
+                        plan = plan + elmensaje!plan
+                        real = real + elmensaje!buenas + elmensaje!malas
+
+                        tplan = tplan + elmensaje!plan
+                        treal = treal + elmensaje!buenas + elmensaje!malas
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(elmensaje!plan, 0))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(plan))
+                        myBuilder.Append("</td>")
+                        '
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(elmensaje!buenas + elmensaje!malas))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(real))
+                        myBuilder.Append("</td>")
+                        '''
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(IIf(hayRendimiento, Math.Round(rendimiento, 0) & "%", "-"))
+                        myBuilder.Append("</td>")
+                        Dim colorMalas = "none"
+                        If elmensaje!malas > 0 Then
+                            colorMalas = "#FADBD8"
+                        End If
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;background-color:" & colorMalas & "'>")
+                        myBuilder.Append(Math.Round(elmensaje!malas))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(scrap, 0) & "%")
+                        myBuilder.Append("</td>")
+
+                        'columna compartida
+                        colorMalas = "none"
+                        If elmensaje!paro2 > 0 Then
+                            colorMalas = "#FADBD8"
+                        End If
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;background-color:" & colorMalas & "'>")
+                        myBuilder.Append(IIf(elmensaje!paro2 > 0, calcularTiempoCad(elmensaje!paro2), "0"))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Math.Round(paros, 0) & "%")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(IIf(hayRendimiento And haydisponibilidad, Math.Round(oee, 0), "-"))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='left' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(Strings.Replace(ValNull(elmensaje!comentarios, "A"), "~~", "<br>"))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("</tr>")
+                        If hHasta > elmensaje!hasta Then
+                            hHasta = elmensaje!hasta
+                        End If
+
+                        thHasta = elmensaje!hasta
+                    Next
+
+                    myBuilder.Append("</tr>")
+
+                    If linea > 1 Then
+                        Dim tRendimiento = 100
+                        Dim tCalidad = 100
+                        Dim tScrap = 0
+                        Dim tParos = 0
+                        Dim tDisponibilidad = 100
+                        If totalDisponibilidad - totalParos <> 0 Then
+                            tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
+                        End If
+                        If ttotalProduccion > 0 Then
+                            tCalidad = (1 - totalCalidad / totalProduccion) * 100
+                            tScrap = totalCalidad / totalProduccion * 100
+                        End If
+                        If totalDisponibilidad > 0 Then
+                            tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
+                            tParos = totalParos / totalDisponibilidad * 100
+                        End If
+                        oeeTA = IIf(tRendimiento > 100, 100, tRendimiento) * tCalidad * tDisponibilidad / 10000
+
+                        myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
+
+                        myBuilder.Append("<td align='center' valign='top'>")
+                        myBuilder.Append(Left(hDesde, 5) & " " & Left(hHasta, 5))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(IIf(totalDisponibilidad > 0, calcularTiempoCad(totalDisponibilidad), "0"))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top'>")
+                        myBuilder.Append(Math.Round(plan, 0))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top'>")
+                        myBuilder.Append(Math.Round(plan))
+                        myBuilder.Append("</td>")
+                        '
+                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(real))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(real))
+                        myBuilder.Append("</td>")
+                        '''
+                        myBuilder.Append("<td align='center' valign='top'>")
+                        myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(tMalas))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(tScrap, 0) & "%")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top'>")
+                        myBuilder.Append(IIf(totalParos > 0, calcularTiempoCad(totalParos), "0"))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='right' valign='top'>")
+                        myBuilder.Append(Math.Round(tParos, 0) & "%")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(oeeTA, 0))
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top'>")
+                        myBuilder.Append("")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("</tr>")
+
+                    End If
+
+                Else
+                    If tipo = 1 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte al turno) " & miTurno & ": Sin información"
+
+                    ElseIf tipo = 2 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": Sin información"
+
+                    ElseIf tipo = 3 Then
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": Sin información"
+
+                    End If
+                    myBuilder.Append("No se encontró información para el reporte...")
+
+                End If
+                If requiereresumen Then
+                    Dim tRendimiento = 100
+                    Dim tCalidad = 100
+                    Dim tScrap = 0
+                    Dim tParos = 0
+                    Dim tDisponibilidad = 100
+                    If ttotalDisponibilidad - ttotalParos <> 0 Then
+                        tRendimiento = ttotalProduccion / (ttotalDisponibilidad - ttotalParos) * 100
+                    End If
+                    If ttotalProduccion > 0 Then
+                        tCalidad = (1 - ttotalCalidad / ttotalProduccion) * 100
+                        tScrap = ttotalCalidad / ttotalProduccion * 100
+                    End If
+                    If ttotalDisponibilidad > 0 Then
+                        tDisponibilidad = (1 - ttotalParos / ttotalDisponibilidad) * 100
+                        tParos = ttotalParos / ttotalDisponibilidad * 100
+                    End If
+                    oeeTA = IIf(tRendimiento > 100, 100, tRendimiento) * tCalidad * tDisponibilidad / 10000
+
+                    myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
+
+                    myBuilder.Append("<td align='center' valign='top'>")
+                    myBuilder.Append(Left(thDesde, 5) & " " & Left(thHasta, 5))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(IIf(ttotalDisponibilidad > 0, calcularTiempoCad(ttotalDisponibilidad), "0"))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top'>")
+                    myBuilder.Append(Math.Round(tplan, 0))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top'>")
+                    myBuilder.Append(Math.Round(tplan))
+                    myBuilder.Append("</td>")
+                    '
+                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(treal))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(treal))
+                    myBuilder.Append("</td>")
+                    '''
+                    myBuilder.Append("<td align='center' valign='top'>")
+                    myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(ttMalas))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(tScrap, 0) & "%")
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top'>")
+                    myBuilder.Append(IIf(ttotalParos > 0, calcularTiempoCad(ttotalParos), "0"))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='right' valign='top'>")
+                    myBuilder.Append(Math.Round(tParos, 0) & "%")
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(oeeTA, 0))
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='center' valign='top'>")
+                    myBuilder.Append("")
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("</tr>")
+                End If
+                myBuilder.Append("</table>")
+                If tipo = 1 Then
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte al turno) " & miTurno & ": " & oeeTA.ToString("0.###") & "%"
+
+                ElseIf tipo = 2 Then
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": " & oeeTA.ToString("0.###") & "%"
+
+                ElseIf tipo = 3 Then
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": " & oeeTA.ToString("0.###") & "%"
+
+                End If
+                agregarLOG("Se envió el correo resumen de OEE", 9, 0)
+                myBuilder.Append("<br>")
+                myBuilder.Append("Por favor no responda a este correo, se envía desde una cuenta no monitoreada...")
+                myBuilder.Append("</body>")
+                myBuilder.Append("</html>")
+
+                mail.IsBodyHtml = True
+                mail.Body = myBuilder.ToString()
+                smtpServer.Send(mail)
+
+            Catch ex As Exception
+                agregarLOG(ex.Message, 9, 0)
+            Finally
+                mail.Dispose()
+            End Try
+
         End If
-        Application.Exit()
     End Sub
+
 
 
 End Module

@@ -16,6 +16,9 @@ Module basico
     Public cadenaConexion As String
     Public be_log_activar As Boolean = False
     Public rutaBD As String = "sigma"
+    Public traduccion As String()
+    Public be_idioma
+
 
     Public Function consultaACT(cadena As String) As Integer
         Dim miConexion = New MySqlConnection

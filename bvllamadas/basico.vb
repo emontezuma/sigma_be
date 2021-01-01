@@ -23,18 +23,34 @@ Module basico
     Public be_log_activar As Boolean = False
     Public rutaBD As String = "sigma"
     Dim filestoDelete(0) As String
+    Public traduccion As String()
+    Public be_idioma
 
     Sub Main(argumentos As String())
+
+        If argumentos.Length Then
+            If Strings.UCase(argumentos(0)) = "VOICES" Then
+                Dim synthesizer99 As New SpeechSynthesizer()
+                Dim CAD = "Total system voice(s): " & synthesizer99.GetInstalledVoices.Count & vbCrLf
+                For Each voice In synthesizer99.GetInstalledVoices
+
+                    Dim info As VoiceInfo
+                    info = voice.VoiceInfo
+                    CAD = CAD & info.Name & vbCrLf
+                Next
+                MsgBox(CAD)
+                Application.Exit()
+            End If
+        End If
 
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede la generación de archivos de voz: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
             cadenaConexion = argumentos(0)
-            cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
-
             Dim mensajesDS As DataSet
             Dim eMensaje = ""
             Dim eTitulo = ""
@@ -56,6 +72,7 @@ Module basico
             Dim laMaquina As String = ""
             Dim laArea As String = ""
             Dim mensaje As String = ""
+            Dim mensajeOriginal As String = ""
             Dim repeticiones As String = ""
             Dim escalado As String = ""
             Dim audios_ruta As String = ""
@@ -78,7 +95,10 @@ Module basico
             Dim UAudio
             Dim readerDS As DataSet = consultaSEL(cadSQL)
             If readerDS.Tables(0).Rows.Count > 0 Then
+
                 Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+                be_idioma = ValNull(reader!idioma_defecto, "N")
+                etiquetas()
                 optimizar = ValNull(reader!optimizar_llamada, "A") = "S"
                 be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
                 mantenerPrioridad = ValNull(reader!mantener_prioridad, "A") = "S"
@@ -89,7 +109,7 @@ Module basico
                 audios_activar = ValNull(reader!audios_activar, "A") = "S"
                 audios_ruta = ValNull(reader!audios_ruta, "A")
                 audios_prefijo = ValNull(reader!audios_prefijo, "A")
-                mensaje = ValNull(reader!mensaje, "A")
+                mensajeOriginal = ValNull(reader!mensaje, "A")
                 UAudio = reader!ultimo_audio
                 vecesPR = ValNull(reader!audios_repeticiones, "N")
                 audios_escalamiento = reader!audios_escalamiento
@@ -104,6 +124,11 @@ Module basico
             Else
                 rutaSMS = Strings.Replace(rutaSMS, "/", "\")
             End If
+            If audios_ruta.Length = 0 Then
+                audios_ruta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            Else
+                audios_ruta = Strings.Replace(audios_ruta, "/", "\")
+            End If
             If Not My.Computer.FileSystem.DirectoryExists(rutaSMS) Then
                 Try
                     My.Computer.FileSystem.CreateDirectory(rutaSMS)
@@ -111,50 +136,53 @@ Module basico
                     rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 End Try
             End If
-            If audios_prefijo.Length > 0 Then
-                audios_prefijo = Strings.Replace(audios_prefijo, "/", "\")
-            End If
-            If audios_ruta.Length > 0 Then
-                audios_ruta = Strings.Replace(audios_ruta, "/", "\")
+            If Not My.Computer.FileSystem.DirectoryExists(audios_ruta) Then
+                Try
+                    My.Computer.FileSystem.CreateDirectory(audios_ruta)
+                Catch ex As Exception
+                    audios_ruta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                End Try
             End If
 
             Dim indiceVoz = 0
-                Dim primeraVoz As String
-                Dim synthesizer As New SpeechSynthesizer()
-                For Each voice In synthesizer.GetInstalledVoices
+            Dim primeraVoz As String
+            Dim synthesizer As New SpeechSynthesizer()
+            For Each voice In synthesizer.GetInstalledVoices
 
-                    indiceVoz = indiceVoz + 1
-                    Dim info As VoiceInfo
-                    info = voice.VoiceInfo
-                    If voz_audio = info.Name Then
-                        indiceVoz = -1
-                        Exit For
-                    End If
-                    If indiceVoz = 1 Then primeraVoz = info.Name
-                Next
-                If indiceVoz > 0 Then
-                    agregarLOG("La voz especificada en el archivo de configuración NO esta registrada en el sistema, se tomará la voz por defecto del PC", 0, 9)
-                    voz_audio = primeraVoz
-                ElseIf indiceVoz = 0 Then
-                    agregarLOG("No se generaron audios para llamadas porque no se encontró alguna voz para reproducir audios en la PC. Por favor revise e intente de nuevo", 0, 9)
+                indiceVoz = indiceVoz + 1
+                Dim info As VoiceInfo
+                info = voice.VoiceInfo
+                If voz_audio = info.Name Then
+                    indiceVoz = -1
+                    Exit For
                 End If
-                Dim generarMensaje As Boolean
-                If indiceVoz <> 0 Then
-                    Dim copiarGeneral As Boolean = True
-                    If audios_activar Then
-                        If UAudio.Equals(System.DBNull.Value) Then
-                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".reportes SET generar_audio = 'P' WHERE (generar_audio = 'N' OR generar_audio = 'R' OR generar_audio = 'E') AND estatus = 0")
-                        Else
-                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".reportes SET generar_audio = 'P' WHERE ((generar_audio = 'N' AND fecha > '" & Format(UAudio, "yyyy/MM/dd HH:mm:ss") & "') OR (generar_audio = 'R') OR (generar_audio = 'E') OR (generar_audio = 'Z')) AND estatus = 0")
-                            regsAfectados = consultaACT("UPDATE " & rutaBD & ".configuracion SET ultimo_audio = NOW()")
-                        End If
+                If indiceVoz = 1 Then primeraVoz = info.Name
+            Next
+            If indiceVoz > 0 Then
+                agregarLOG(traduccion(10), 0, 9)
+                voz_audio = primeraVoz
+            ElseIf indiceVoz = 0 Then
+                agregarLOG(traduccion(11), 0, 9)
+            End If
+            Dim generarMensaje As Boolean
+            If indiceVoz <> 0 Then
+                Dim copiarGeneral As Boolean = True
+                If audios_activar Then
+                    If UAudio.Equals(System.DBNull.Value) Then
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".reportes SET generar_audio = 'P' WHERE (generar_audio = 'N' OR generar_audio = 'R' OR generar_audio = 'E') AND estatus = 0")
+                    Else
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".reportes SET generar_audio = 'P' WHERE ((generar_audio = 'N' AND fecha > '" & Format(UAudio, "yyyy/MM/dd HH:mm:ss") & "') OR (generar_audio = 'R') OR (generar_audio = 'E') OR (generar_audio = 'Z')) AND estatus = 0")
+                        regsAfectados = consultaACT("UPDATE " & rutaBD & ".configuracion SET ultimo_audio = NOW()")
+                    End If
                     cadSQL = "SELECT d.id AS reportenro, d.primer_audio, d.area, d.generar_audio, d.repeticiones, d.escalado, d.fecha, d.estatus AS rep_estatus, b.*, e.nombre as nlinea, f.nombre as nmaquina, b.nombre as narea, h.nombre as nfalla FROM " & rutaBD & ".reportes d INNER JOIN " & rutaBD & ".cat_areas b ON d.area = b.id LEFT JOIN " & rutaBD & ".cat_lineas e ON d.linea = e.id LEFT JOIN " & rutaBD & ".cat_maquinas f ON d.maquina = f.id LEFT JOIN " & rutaBD & ".cat_fallas h ON d.falla = h.id WHERE (d.generar_audio = 'P'" & IIf(tiempo_audios > 0, " OR (d.estatus = 0 AND (TIME_TO_SEC(TIMEDIFF(NOW(), d.audios) >= " & tiempo_audios & ") OR ISNULL(d.audios))))", ")")
                     mensajesDS = consultaSEL(cadSQL)
-                        generarMensaje = False
+                    generarMensaje = False
 
-                        If mensajesDS.Tables(0).Rows.Count > 0 Then
-                            Dim numeroUnico = 0
+                    If mensajesDS.Tables(0).Rows.Count > 0 Then
+                        Dim numeroUnico = 0
+
                         For Each elmensaje In mensajesDS.Tables(0).Rows
+                            mensaje = mensajeOriginal
                             If audios_externos Then
                                 If vecesPR > 1 And ValNull(elmensaje!primer_audio, "A") = "N" Then
                                 Else
@@ -183,22 +211,22 @@ Module basico
                                     mensaje = Replace(mensaje, "[5]", Format(fecha, "dd/MM HH:mm"))
                                     mensaje = Replace(mensaje, "[11]", tiempo)
                                     If (audios_escalamiento = 1 Or audios_escalamiento = 3) And repeticiones > 0 And elmensaje!generar_audio = "R" Then
-                                        mensaje = Replace(mensaje, "[20]", "REPETICIÓN: " + repeticiones)
+                                        mensaje = Replace(mensaje, "[20]", traduccion(1) + repeticiones)
                                     Else
                                         mensaje = Replace(mensaje, "[20]", "")
                                     End If
                                     If (audios_escalamiento = 2 Or audios_escalamiento = 3) And escalado > 0 And elmensaje!generar_audio = "E" Then
-                                        mensaje = Replace(mensaje, "[30]", "ESCALADO AL NIVEL: " + escalado)
+                                        mensaje = Replace(mensaje, "[30]", traduccion(2) + escalado)
                                     Else
                                         mensaje = Replace(mensaje, "[30]", "")
                                     End If
                                 Else
-                                    mensaje = "MÁQUINA " & laMaquina & " FALLA: " & laFalla & " "
+                                    mensaje = traduccion(3) & laMaquina & traduccion(4) & laFalla & " "
                                     If (audios_escalamiento = 1 Or audios_escalamiento = 3) And repeticiones > 0 And elmensaje!generar_audio = "R" Then
-                                        mensaje = mensaje & " REPETICIÓN: " & repeticiones
+                                        mensaje = mensaje & " " & traduccion(1) & repeticiones
                                     End If
                                     If (audios_escalamiento = 2 Or audios_escalamiento = 3) And escalado > 0 And elmensaje!generar_audio = "E" Then
-                                        mensaje = mensaje & " ESCALADO AL NIVEL: " & escalado
+                                        mensaje = mensaje & " " & traduccion(2) & escalado
                                     End If
                                 End If
                                 If traducir Then mensaje = traducirMensaje(mensaje)
@@ -227,7 +255,7 @@ Module basico
                                         'Se procesa el audio
                                         Try
                                             Dim synthesizer0 As New SpeechSynthesizer()
-                                            nombreFile = Format(DateAndTime.Now(), "yyyyMMddHHmmss" & numeroUnico) & ".wav"
+                                            nombreFile = Format(DateAndTime.Now(), "yyyyMMddHHmmss" & numeroUnico) & "~R" & nroReporte & "~.wav"
                                             audioTMP = rutaArea & "\audio_tmp" & nombreFile
                                             audioDEF = rutaArea & "\audio_def" & nombreFile
                                             If My.Computer.FileSystem.FileExists(prefijo & "\prefijo.wav") Then
@@ -323,7 +351,7 @@ Module basico
                                         'Se procesa el audio
                                         Try
                                             Dim synthesizer0 As New SpeechSynthesizer()
-                                            Dim nombreFile = Format(DateAndTime.Now(), "yyyyMMddHHmmss" & numeroUnico) & ".wav"
+                                            Dim nombreFile = Format(DateAndTime.Now(), "yyyyMMddHHmmss" & numeroUnico) & "~R" & nroReporte & "~.wav"
                                             Dim audioTMP = audios_ruta & "\audio_tmp" & nombreFile
                                             Dim audioDEF = audios_ruta & "\audio_def" & nombreFile
                                             If My.Computer.FileSystem.FileExists(audios_prefijo & "\prefijo.wav") Then
@@ -415,31 +443,39 @@ Module basico
                     End If
                 End If
 
-                'Envío de mensajes a MMCall
+                'Generacion de audios para llamadas
 
 
                 If be_alarmas_llamadas Then
-                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 0 AND estatus = 'E'")
+                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 0 AND estatus = 'E' AND alerta <> -1000")
                     Dim agrupado As Boolean = True
                     If Not optimizar Then
-                        cadSQL = "SELECT a.id, a.lista, d.telefonos, d.hora_desde, d.hora_hasta, a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND b.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+                        cadSQL = "SELECT a.alarma AS nmensaje, a.tipo AS tmensaje, a.id, a.lista, d.telefonos, d.hora_desde, d.hora_hasta, a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND b.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
                         agrupado = False
                     ElseIf mantenerPrioridad Then
-                        cadSQL = "SELECT a.lista, a.prioridad, b.telefonos, b.hora_desde, b.hora_hasta, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, b.telefonos, b.hora_desde, b.hora_hasta ORDER BY prioridad DESC"
+                        cadSQL = "SELECT 0 AS nmensaje, 0 AS tmensaje, a.lista, a.prioridad, b.telefonos, b.hora_desde, b.hora_hasta, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY nmensaje, tmensaje, a.prioridad, a.lista, b.telefonos, b.hora_desde, b.hora_hasta ORDER BY prioridad DESC"
                     Else
-                        cadSQL = "SELECT a.lista, b.telefonos, 0 AS prioridad, b.hora_desde, b.hora_hasta, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.lista, b.telefonos, b.hora_desde, b.hora_hasta"
+                        cadSQL = "SELECT 0 AS nmensaje, 0 AS tmensaje, a.lista, b.telefonos, 0 AS prioridad, b.hora_desde, b.hora_hasta, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY nmensaje, tmensaje, a.lista, b.telefonos, b.hora_desde, b.hora_hasta"
 
                     End If
                     'Se preselecciona la voz
                     mensajesDS = consultaSEL(cadSQL)
+                    Dim nMensaje = 0
+                    Dim tMensaje = 0
+                    Dim unico = 0
                     If mensajesDS.Tables(0).Rows.Count > 0 Then
                         For Each elmensaje In mensajesDS.Tables(0).Rows
+                            unico = unico + 1
+
                             canales = ValNull(elmensaje!telefonos, "A")
+                            nMensaje = ValNull(elmensaje!nmensaje, "N")
+                            tMensaje = ValNull(elmensaje!tmensaje, "N")
+                            If tMensaje = 8 Then nMensaje = 0 'No se marca la llamada de resolución
                             eMensaje = ""
                             If elmensaje!cuenta > 1 Then
-                                eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
+                                eMensaje = traduccion(5).Replace("campo_0", elmensaje!cuenta)
                                 If mantenerPrioridad And elmensaje!prioridad > 0 Then
-                                    eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES PRIORITARIOS"
+                                    eMensaje = traduccion(6).Replace("campo_0", elmensaje!cuenta)
                                 End If
                             ElseIf agrupado Then
                                 cadSQL = "SELECT * FROM " & rutaBD & ".mensajes_procesados WHERE mensaje = " & elmensaje!id
@@ -474,9 +510,11 @@ Module basico
                                 If canales.Length > 0 Then
                                     Dim arreCanales = canales.Split(New Char() {";"c})
                                     For i = LBound(arreCanales) To UBound(arreCanales)
-                                        'Redimensionamos el Array temporal y preservamos el valor  
-                                        ReDim Preserve telefonos(totalItems + i)
-                                        telefonos(totalItems + i) = arreCanales(i)
+                                        If arreCanales(i).Length > 0 Then
+                                            'Redimensionamos el Array temporal y preservamos el valor  
+                                            ReDim Preserve telefonos(totalItems + i)
+                                            telefonos(totalItems + i) = arreCanales(i)
+                                        End If
                                     Next
                                     tempArray = telefonos
                                     totalItems = telefonos.Length
@@ -498,7 +536,7 @@ Module basico
                                     canales = ""
                                 End If
                                 mensajeGenerado = False
-                                Dim NArchivo = rutaSMS & "\numero_sustituir" & Format(Now, "hhmmss") & "1_1.wav"
+                                Dim NArchivo = rutaSMS & "\numero_sustituir" & Format(Now, "hhmmss") & IIf(nMensaje > 0, "~A" & nMensaje & "~", "") & unico & "1_1.wav"
                                 For i = 0 To UBound(telefonos)
                                     If telefonos(i).Length > 0 Then
                                         Try
@@ -547,17 +585,132 @@ Module basico
                             regsAfectados = consultaACT(cadSQL)
                         Next
                         If audiosGen > 0 Or audiosNGen > 0 Then
-                            agregarLOG("Se generaron " & audiosGen & " audio(s) y no se generaron " & audiosNGen & " audio(s)")
+                            agregarLOG(traduccion(9).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
                         End If
                     End If
 
-                    cadSQL = "SELECT a.id, a.texto, b.telefonos FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' WHERE a.alerta = 0 AND a.canal = 0 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+
+                    regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 0 AND estatus = 'E' AND alerta = -1000")
+                    cadSQL = "SELECT a.id, d.telefonos, d.hora_desde, d.hora_hasta, 0, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' AND a.alerta = -1000 ORDER BY a.prioridad DESC, a.id"
                     mensajesDS = consultaSEL(cadSQL)
-                    generarMensaje = False
+                    nMensaje = 0
+                    tMensaje = 0
+                    unico = 0
+
                     If mensajesDS.Tables(0).Rows.Count > 0 Then
                         For Each elmensaje In mensajesDS.Tables(0).Rows
+                            unico = unico + 1
+
                             canales = ValNull(elmensaje!telefonos, "A")
-                            eMensaje = "Se agotó el número de intentos de llamada para el teléfono " & ValNull(elmensaje!texto, "A")
+                            eMensaje = ValNull(elmensaje!texto, "A")
+                            Dim generarLlamada As Boolean = False
+                            If canales.Length > 0 Then
+                                If elmensaje!hora_desde.Equals(System.DBNull.Value) And elmensaje!hora_hasta.Equals(System.DBNull.Value) Then
+                                    generarLlamada = True
+                                ElseIf elmensaje!hora_desde.Equals(System.DBNull.Value) Then
+                                    If Format(DateAndTime.Now(), "HH:mm:ss") <= elmensaje!hora_hasta.ToString Then
+                                        generarLlamada = True
+                                    End If
+                                ElseIf elmensaje!hora_hasta.Equals(System.DBNull.Value) Then
+                                    If Format(DateAndTime.Now(), "HH:mm:ss") >= elmensaje!hora_desde.ToString Then
+                                        generarLlamada = True
+                                    End If
+                                ElseIf Format(DateAndTime.Now(), "HH:mm:ss") >= elmensaje!hora_desde.ToString And Format(DateAndTime.Now(), "HH:mm:ss") <= elmensaje!hora_hasta.ToString Then
+                                    generarLlamada = True
+                                End If
+
+                            End If
+                            If generarLlamada Then
+                                Dim telefonos As String()
+                                Dim tempArray As String()
+                                Dim totalItems = 0
+                                If canales.Length > 0 Then
+                                    Dim arreCanales = canales.Split(New Char() {";"c})
+                                    For i = LBound(arreCanales) To UBound(arreCanales)
+                                        If arreCanales(i).Length > 0 Then
+                                            'Redimensionamos el Array temporal y preservamos el valor  
+                                            ReDim Preserve telefonos(totalItems + i)
+                                            telefonos(totalItems + i) = arreCanales(i)
+                                        End If
+                                    Next
+                                    tempArray = telefonos
+                                    totalItems = telefonos.Length
+
+                                    Dim x As Integer, y As Integer
+                                    Dim z As Integer
+
+                                    For x = 0 To UBound(telefonos)
+                                        z = 0
+                                        For y = 0 To UBound(telefonos) - 1
+                                            'Si el elemento del array es igual al array temporal  
+                                            If telefonos(x) = tempArray(z) And y <> x Then
+                                                'Entonces Eliminamos el valor duplicado  
+                                                telefonos(y) = ""
+                                            End If
+                                            z = z + 1
+                                        Next y
+                                    Next x
+                                    canales = ""
+                                End If
+                                mensajeGenerado = False
+                                Dim NArchivo = rutaSMS & "\numero_sustituir" & Format(Now, "hhmmss") & IIf(nMensaje > 0, "~A" & nMensaje & "~", "") & unico & "1_1.wav"
+                                For i = 0 To UBound(telefonos)
+                                    If telefonos(i).Length > 0 Then
+                                        Try
+                                            Dim synthesizer0 As New SpeechSynthesizer()
+
+                                            synthesizer0.SetOutputToWaveFile(NArchivo)
+                                            synthesizer0.SelectVoice(voz_audio)
+                                            synthesizer0.Volume = 100 '  // 0...100
+                                            synthesizer0.Rate = audio_rate '     // -10...10
+                                            Dim builder2 As New PromptBuilder()
+                                            If traducir Then eMensaje = traducirMensaje(eMensaje)
+                                            builder2.AppendText(eMensaje)
+                                            builder2.Culture = synthesizer0.Voice.Culture
+                                            synthesizer0.Speak(builder2)
+                                            synthesizer0.SetOutputToDefaultAudioDevice()
+                                            mensajeGenerado = True
+
+                                            Exit For
+                                        Catch ex As Exception
+                                            miError = ex.Message
+                                            audiosNGen = audiosNGen + 1
+                                        End Try
+                                    End If
+                                Next
+                                If mensajeGenerado Then
+                                    For i = 0 To UBound(telefonos)
+                                        If telefonos(i).Length > 0 Then
+                                            Dim NuevoArchivo = Replace(NArchivo, "numero_sustituir", telefonos(i))
+                                            My.Computer.FileSystem.CopyFile(NArchivo, NuevoArchivo)
+                                            audiosGen = audiosGen + 1
+                                        End If
+                                    Next
+
+                                End If
+                                My.Computer.FileSystem.DeleteFile(NArchivo)
+                            End If
+                            cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
+                            regsAfectados = consultaACT(cadSQL)
+                        Next
+                        If audiosGen > 0 Or audiosNGen > 0 Then
+                            agregarLOG(traduccion(9).Replace("campo_0", audiosGen).Replace("campo_1", audiosNGen))
+                        End If
+                    End If
+
+
+
+
+                    cadSQL = "SELECT a.alarma as nmensaje, a.id, a.texto, b.telefonos FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' WHERE a.alerta = 0 AND a.canal = 0 AND a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+                    mensajesDS = consultaSEL(cadSQL)
+                    generarMensaje = False
+                    unico = 0
+                    If mensajesDS.Tables(0).Rows.Count > 0 Then
+                        For Each elmensaje In mensajesDS.Tables(0).Rows
+                            unico = unico + 1
+                            canales = ValNull(elmensaje!telefonos, "A")
+                            eMensaje = traduccion(7) & ValNull(elmensaje!texto, "A")
+                            nMensaje = traduccion(7) & ValNull(elmensaje!nmensaje, "N")
                             If canales.Length > 0 Then
                                 Dim telefonos As String()
                                 Dim tempArray As String()
@@ -589,7 +742,7 @@ Module basico
                                     canales = ""
                                 End If
                                 mensajeGenerado = False
-                                Dim NArchivo = rutaSMS & "\numero_sustituir" & Format(Now, "hhmmss") & "2_1.wav"
+                                Dim NArchivo = rutaSMS & "\numero_sustituir" & Format(Now, "hhmmss") & IIf(nMensaje > 0, "~A" & nMensaje & "~", "") & unico & "2_1.wav"
                                 For i = 0 To UBound(telefonos)
                                     If telefonos(i).Length > 0 Then
                                         Try
@@ -631,18 +784,14 @@ Module basico
                             End If
                         Next
                         If audiosNGen > 0 Then
-                            agregarLOG("No se generaron " & audiosNGen & " audio(s)")
+                            agregarLOG(traduccion(8).Replace("campo_0", audiosNGen))
                         End If
-                        'If audiosGen > 0 Then
-                        ' agregarLOG("Se generaron " & audiosGen & " audio(s). Inicia ARDUINO")
-                        ' Shell(Application.StartupPath & "\arduino.exe " & Chr(34) & cadenaConexion & Chr(34), AppWinStyle.MinimizedNoFocus)
-                        'End If
                     End If
                 End If
 
             End If
-            End If
-            Application.Exit()
+        End If
+        Application.Exit()
     End Sub
     Public Function consultaACT(cadena As String) As Integer
         Dim miConexion = New MySqlConnection
@@ -774,11 +923,11 @@ Module basico
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(12)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(13)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(14)
         End If
     End Function
 
@@ -860,7 +1009,16 @@ Module basico
             If Not IsNothing(filestoDelete(i)) Then eliminarArchivo(filestoDelete(i))
         Next
     End Sub
-
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 2 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+    End Sub
 
 End Module
 

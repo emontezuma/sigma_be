@@ -87,17 +87,19 @@ Partial Class Form1
         '
         Me.LabelControl3.Appearance.Font = New System.Drawing.Font("Lucida Sans", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.LabelControl3.Appearance.Options.UseFont = True
-        Me.LabelControl3.Location = New System.Drawing.Point(13, 66)
+        Me.LabelControl3.AutoEllipsis = True
+        Me.LabelControl3.AutoSizeMode = DevExpress.XtraEditors.LabelAutoSizeMode.None
+        Me.LabelControl3.Location = New System.Drawing.Point(13, 70)
         Me.LabelControl3.Margin = New System.Windows.Forms.Padding(2)
         Me.LabelControl3.Name = "LabelControl3"
-        Me.LabelControl3.Size = New System.Drawing.Size(73, 15)
+        Me.LabelControl3.Size = New System.Drawing.Size(98, 17)
         Me.LabelControl3.TabIndex = 3
-        Me.LabelControl3.Text = "Revisar (seg)"
+        Me.LabelControl3.Text = "Review every (sec)"
         '
         'TextEdit3
         '
         Me.TextEdit3.EditValue = "10"
-        Me.TextEdit3.Location = New System.Drawing.Point(88, 63)
+        Me.TextEdit3.Location = New System.Drawing.Point(126, 66)
         Me.TextEdit3.Margin = New System.Windows.Forms.Padding(2)
         Me.TextEdit3.Name = "TextEdit3"
         Me.TextEdit3.Properties.Appearance.Font = New System.Drawing.Font("Lucida Sans", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
@@ -128,7 +130,7 @@ Partial Class Form1
         'TextEdit16
         '
         Me.TextEdit16.EditValue = ""
-        Me.TextEdit16.Location = New System.Drawing.Point(88, 37)
+        Me.TextEdit16.Location = New System.Drawing.Point(126, 37)
         Me.TextEdit16.Margin = New System.Windows.Forms.Padding(2)
         Me.TextEdit16.Name = "TextEdit16"
         Me.TextEdit16.Properties.Appearance.Font = New System.Drawing.Font("Lucida Sans", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
@@ -140,7 +142,7 @@ Partial Class Form1
         Me.TextEdit16.Properties.BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.HotFlat
         Me.TextEdit16.Properties.MaxLength = 500
         Me.TextEdit16.Properties.NullText = "Usuario del servicio de SMS"
-        Me.TextEdit16.Size = New System.Drawing.Size(244, 24)
+        Me.TextEdit16.Size = New System.Drawing.Size(206, 24)
         Me.TextEdit16.TabIndex = 1
         '
         'LabelControl27
@@ -284,16 +286,16 @@ Partial Class Form1
         Me.LabelControl2.Location = New System.Drawing.Point(224, 12)
         Me.LabelControl2.Margin = New System.Windows.Forms.Padding(2, 3, 2, 3)
         Me.LabelControl2.Name = "LabelControl2"
-        Me.LabelControl2.Size = New System.Drawing.Size(150, 15)
+        Me.LabelControl2.Size = New System.Drawing.Size(155, 15)
         Me.LabelControl2.TabIndex = 17
-        Me.LabelControl2.Text = "Versión 1.20 (27Jun2020)"
+        Me.LabelControl2.Text = "Versión 1.20 (17Sep2020)"
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.BackColor = System.Drawing.SystemColors.Control
-        Me.ClientSize = New System.Drawing.Size(390, 276)
+        Me.ClientSize = New System.Drawing.Size(390, 249)
         Me.Controls.Add(Me.LabelControl2)
         Me.Controls.Add(Me.TextEdit1)
         Me.Controls.Add(Me.LinkLabel1)

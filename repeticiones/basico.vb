@@ -17,13 +17,16 @@ Module basico
     Public serialMmcall As String
     Public rutaBD As String = "sigma"
     Public rutaMMCALL As String = "mmcall"
+    Public traduccion As String()
+    Public be_idioma
+
 
 
     Sub Main(argumentos As String())
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede iniciar el envío de mensajes a MMCall: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
 
             cadenaConexion = argumentos(0)
@@ -52,9 +55,11 @@ Module basico
                 serialMmcall = ValNull(reader.Tables(0).Rows(0)!mmcall, "A")
             End If
 
-            cadSQL = "SELECT pagers_val, tiempo_andon, url_mmcall, accion_mmcall FROM " & rutaBD & ".configuracion"
+            cadSQL = "SELECT idioma_defecto, pagers_val, tiempo_andon, url_mmcall, accion_mmcall FROM " & rutaBD & ".configuracion"
             reader = consultaSEL(cadSQL)
             If reader.Tables(0).Rows.Count > 0 Then
+                be_idioma = ValNull(reader.Tables(0).Rows(0)!idioma_defecto, "N")
+                etiquetas()
                 tiempo_andon = ValNull(reader.Tables(0).Rows(0)!tiempo_andon, "N")
                 accion_mmcall = ValNull(reader.Tables(0).Rows(0)!accion_mmcall, "A")
                 url_mmcall = ValNull(reader.Tables(0).Rows(0)!url_mmcall, "A")
@@ -138,16 +143,44 @@ Module basico
                             For i = 0 To UBound(mmcalls)
                                 If mmcalls(i).Length > 0 Then
                                     'Se valida el reloj
+
                                     Dim posReloj = Strings.InStr(mmcalls(i), "number=")
-                                    Dim iReloj = Strings.Mid(mmcalls(i), posReloj + 7)
+                                    Dim posiciones = 7
+                                    Dim esNumero = True
+                                    If posReloj = 0 Then
+                                        posReloj = Strings.InStr(mmcalls(i), "division=")
+                                        posiciones = 9
+                                        esNumero = False
+                                    End If
+                                    Dim iReloj = ""
+
+                                    If posReloj > 0 Then
+                                        iReloj = Strings.Mid(mmcalls(i), posReloj + posiciones)
+                                    End If
+
                                     If iReloj.Length = 0 Then
                                         If IsNumeric(mmcalls(i)) Then
                                             iReloj = mmcalls(i)
                                         Else
-                                            iReloj = "-1"
+                                            If IsNumeric(Strings.Mid(mmcalls(i), 2)) Then
+                                                iReloj = mmcalls(i)
+                                            Else
+                                                iReloj = "-1"
+                                            End If
                                         End If
                                     End If
+
+
                                     If iReloj <> "-1" Then
+                                        If UCase(Strings.Left(iReloj, 1)) = "D" Then
+                                            iReloj = Val(Strings.Mid(iReloj, 2)) + 180
+                                        ElseIf UCase(Strings.Left(iReloj, 1)) = "A" Then
+                                            iReloj = 0
+                                        ElseIf Not esNumero Then
+                                            iReloj = Val(iReloj) + 180
+                                        Else
+                                            iReloj = Val(iReloj) + 100
+                                        End If
                                         If Not valReloj(iReloj) And validar_reloj Then
                                             agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
                                             Continue For
@@ -157,43 +190,17 @@ Module basico
                                             Else
                                                 cadMMCALL = cadMMCALL + ","
                                             End If
-                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & (iReloj + 100) & "', 0, NOW())"
+                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
 
                                         End If
                                     End If
 
-                                    'Try
-                                    'If validarURI(mmcalls(i) & "&message=" & eMensaje) Then
-                                    'Dim fr As System.Net.HttpWebRequest
-                                    'Dim targetURI As New Uri(mmcalls(i) & "&message=" & eMensaje)
-                                    '
-                                    'fr = DirectCast(HttpWebRequest.Create(targetURI), System.Net.HttpWebRequest)
-                                    'If (fr.GetResponse().ContentLength > 0) Then
-                                    'Dim str As New System.IO.StreamReader(fr.GetResponse().GetResponseStream())
-                                    'respuestaWS = str.ReadToEnd
-                                    'Str.Close()
-                                    'End If
-                                    '   mensajeGenerado = respuestaWS = "success" And Not mensajeGenerado
-                                    '  If mensajeGenerado Then
-                                    ' audiosGen = audiosGen + 1
-                                    'Else
-                                    '   audiosNGen = audiosNGen + 1
-                                    '  agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & respuestaWS, evento!id, 9)
-                                    'End If
-                                    'Else
-                                    '   audiosNGen = audiosNGen + 1
-                                    '  agregarLOG("" & mmcalls(i) & "&message=" & eMensaje & " error: la dirección no es válida", evento!id, 9)
-                                    'End If
-                                    'Catch ex As System.Net.WebException
-                                    'agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: " & ex.Message, evento!id, 9)
-                                    'audiosNGen = audiosNGen + 1
-                                    'End Try
                                 End If
                             Next
                         End If
                         If cadMMCALL.Length > 0 Then cadMMCALL = cadMMCALL & ";"
                         regsAfectados = consultaACT(cadMMCALL & "UPDATE " & rutaBD & ".reportes SET mmcall = NOW() WHERE id = " & evento!id)
-                        agregarLOG("Se ha enviado una repetición (MMCall) asociado al reporte: " & evento!id)
+                        agregarLOG(traduccion(7) & evento!id)
 
                     Next
                 End If
@@ -336,20 +343,14 @@ Module basico
         End Try
     End Function
 
-    'Function cadenaConexion() As String
-    'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-    'cadenaConexion = "server=10.241.241.30;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-
-    'End Function
-
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(4)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(5)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(6)
         End If
     End Function
 
@@ -483,5 +484,16 @@ Module basico
             Next
         End If
     End Function
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 4 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+    End Sub
+
 End Module
 

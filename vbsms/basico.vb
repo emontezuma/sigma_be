@@ -17,8 +17,10 @@ Module basico
     Public autenticado As Boolean
     Public cadenaConexion As String
     Public be_log_activar As Boolean = False
-    Public rutaBD As String = "sigmafm"
+    Public rutaBD As String = "sigma"
     Public cliente As String = ""
+    Public traduccion As String()
+    Public be_idioma
     ''' <summary>
     ''' 
     ''' </summary>
@@ -27,7 +29,7 @@ Module basico
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length = 0 Then
-            MsgBox("No se puede la generación de archivos para SMS: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
             cadenaConexion = argumentos(0)
             'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
@@ -58,6 +60,8 @@ Module basico
             Dim readerDS As DataSet = consultaSEL(cadSQL)
             If readerDS.Tables(0).Rows.Count > 0 Then
                 Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+                be_idioma = ValNull(reader!idioma_defecto, "N")
+                etiquetas()
                 optimizar = ValNull(reader!optimizar_sms, "A") = "S"
                 be_log_activar = ValNull(reader!be_log_activar, "A") = "S"
                 mantenerPrioridad = ValNull(reader!mantener_prioridad, "A") = "S"
@@ -77,7 +81,7 @@ Module basico
                         rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     End Try
                 End If
-                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 1 AND estatus = 'E'")
+                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 1 AND estatus = 'E' AND alerta <> -1000")
                 Dim agrupado As Boolean = True
                 'heb/ se agrega el campo mmcall
                 Dim campoMMCALL = ""
@@ -85,19 +89,25 @@ Module basico
                     campoMMCALL = "d.mmcall, d.referencia, "
                 End If
                 If Not optimizar Then
-                    cadSQL = "SELECT a.id, d.telefonos, " & campoMMCALL & "a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND b.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
+                    cadSQL = "SELECT a.alarma AS nmensaje, a.tipo AS tmensaje, a.id, a.proceso, d.telefonos, " & campoMMCALL & "a.prioridad, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_alertas b on a.alerta = b.id INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND b.estatus = 'A' WHERE a.estatus = '" & idProceso & "' ORDER BY a.prioridad DESC, a.id"
                     agrupado = False
                 ElseIf mantenerPrioridad Then
-                    cadSQL = "SELECT a.lista, a.prioridad, " & campoMMCALL & "b.telefonos, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.prioridad, a.lista, " & campoMMCALL & "b.telefonos ORDER BY prioridad DESC"
+                    cadSQL = "SELECT a.lista, 0 as proceso, 0 AS nmensaje, 0 AS tmensaje, a.prioridad, " & campoMMCALL & "b.telefonos, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY nmensaje, tmensaje, a.prioridad, a.lista, " & campoMMCALL & "b.telefonos ORDER BY prioridad DESC"
                 Else
-                    cadSQL = "SELECT a.lista, " & campoMMCALL & "b.telefonos, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY a.lista, " & campoMMCALL & "b.telefonos"
+                    cadSQL = "SELECT a.lista, 0 as proceso, 0 AS nmensaje, 0 AS tmensaje, " & campoMMCALL & "b.telefonos, 0 AS prioridad, COUNT(*) AS cuenta, MAX(a.id) AS id FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion b ON a.lista = b.id AND b.estatus = 'A' INNER JOIN " & rutaBD & ".cat_alertas c on a.alerta = c.id WHERE a.estatus = '" & idProceso & "' GROUP BY nmensaje, tmensaje, a.lista, " & campoMMCALL & "b.telefonos"
 
                 End If
                 'Se preselecciona la voz
                 mensajesDS = consultaSEL(cadSQL)
+                Dim nMensaje = 0
+                Dim tMensaje = 0
+
                 If mensajesDS.Tables(0).Rows.Count > 0 Then
                     For Each elmensaje In mensajesDS.Tables(0).Rows
                         canales = ValNull(elmensaje!telefonos, "A")
+                        nMensaje = ValNull(elmensaje!nmensaje, "N")
+                        tMensaje = ValNull(elmensaje!tmensaje, "N")
+                        If tMensaje = 8 Then nMensaje = 0 'No se marca la llamada de resolución
                         eMensaje = ""
                         If elmensaje!cuenta > 1 Then
                             eMensaje = "HAY " & elmensaje!cuenta & " MENSAJES POR ATENDER"
@@ -134,15 +144,21 @@ Module basico
                                 Dim arreCanales = canales.Split(New Char() {";"c})
                                 For i = LBound(arreCanales) To UBound(arreCanales)
                                     'Redimensionamos el Array temporal y preservamos el valor  
-                                    ReDim Preserve telefonos(totalItems + i)
-                                    telefonos(totalItems + i) = arreCanales(i)
+
+
+                                    If arreCanales(i).Length > 0 Then
+                                        'Redimensionamos el Array temporal y preservamos el valor  
+                                        ReDim Preserve telefonos(totalItems + i)
+                                        telefonos(totalItems + i) = arreCanales(i)
+                                    End If
+
+
                                 Next
                                 tempArray = telefonos
                                 totalItems = telefonos.Length
 
                                 Dim x As Integer, y As Integer
                                 Dim z As Integer
-
                                 For x = 0 To UBound(telefonos)
                                     z = 0
                                     For y = 0 To UBound(telefonos) - 1
@@ -166,6 +182,7 @@ Module basico
                             Dim ct As String = ""
                             Dim autorizacion As String = ""
                             Dim body As String = ""
+
                             If cliente = "HEB2" Then
                                 Dim webService As String = ValNull(elmensaje!mmcall, "A")
                                 webService = Strings.Replace(webService, vbCrLf, "")
@@ -208,11 +225,78 @@ Module basico
                                 Else
                                     validado = False
                                 End If
-                            Else
-                                validado = True
-                            End If
+                            ElseIf cliente = "HEB" Then
+                                If validarURI("massive.chattigo.com/message/login") Then
+                                    Dim response = ""
+                                    Try
+                                        Dim ntemplate = Strings.Left(elmensaje!texto, Strings.InStr(elmensaje!texto, ";") - 1)
+                                        Dim nCaja = Strings.Mid(elmensaje!texto, Strings.InStr(elmensaje!texto, ";") + 1)
+                                        Dim request As HttpWebRequest
+                                        Dim targetURI As New Uri("https://massive.chattigo.com/message/login")
+                                        request = HttpWebRequest.Create(targetURI)
+                                        body = "{" & Chr(34) & "username" & Chr(34) & ":" & Chr(34) & "ggalan@hebmex.com" & Chr(34) & ", " & Chr(34) & "password" & Chr(34) & ":" & Chr(34) & "ApiMassive1" & Chr(34) & "}"
+                                        'body = Strings.Replace(body, "~NUMERO~", "52" & telefonos(i))
+                                        request.ContentLength = Encoding.UTF8.GetBytes(body).Length
+                                        request.Method = "POST"
+                                        'request.ContentType = ct
+                                        'request.Headers.Add(HttpRequestHeader.Authorization, autorizacion)
 
-                            If validado Then
+                                        Using requestStream = request.GetRequestStream
+                                            requestStream.Write(Encoding.UTF8.GetBytes(body), 0, body.Length)
+                                            requestStream.Close()
+
+                                            Using responseStream = request.GetResponse.GetResponseStream
+                                                Using reader As New StreamReader(responseStream)
+                                                    response = reader.ReadToEnd()
+                                                End Using
+                                            End Using
+                                        End Using
+                                        Dim cadTelefonos = ""
+                                        For i = 0 To UBound(telefonos)
+                                            If Strings.Trim(telefonos(i)).Length > 0 Then
+                                                cadTelefonos = cadTelefonos & "{" & Chr(34) & "destination" & Chr(34) & ": " & Chr(34) & telefonos(i) & Chr(34) & "},"
+                                            End If
+                                        Next i
+                                        cadTelefonos = Strings.Left(cadTelefonos, Len(cadTelefonos) - 1)
+                                        If response.Length > 0 Then
+                                            Dim request2 As HttpWebRequest
+                                            Dim targetURI2 As New Uri("https://massive.chattigo.com/message/inbound")
+                                            request = HttpWebRequest.Create(targetURI2)
+                                            body = "{" & Chr(34) & "id" & Chr(34) & ":" & Chr(34) & "404" & Chr(34) & ", " & Chr(34) & "did" & Chr(34) & ":" & Chr(34) & "5218182528316" & Chr(34) & ", " & Chr(34) & "type" & Chr(34) & ":" & Chr(34) & "HSM" & Chr(34) & "," & Chr(34) & "channel" & Chr(34) & ":" & Chr(34) & "WHATSAPP" & Chr(34) & "," & Chr(34) & "hsm" & Chr(34) & ": {" & Chr(34) & "destinations" & Chr(34) & ": [" & cadTelefonos & "]," & Chr(34) & "namespace" & Chr(34) & ":" & Chr(34) & "956443a5_36e6_47d5_9aa0_60f6e187ac66" & Chr(34) & "," & Chr(34) & "template" & Chr(34) & ":" & Chr(34) & nTemplate & Chr(34) & "," & Chr(34) & "parameters" & Chr(34) & ": [" & Chr(34) & nCaja & Chr(34) & "]," & Chr(34) & "languageCode" & Chr(34) & ":" & Chr(34) & "es" & Chr(34) & "}}"
+                                            request.ContentLength = Encoding.UTF8.GetBytes(body).Length
+                                            request.Method = "POST"
+                                            request.ContentType = "application/x-www-form-urlencoded"
+                                            request.KeepAlive = True
+                                            Dim dosP = Strings.InStr(response, ":") + 2
+                                            request.Headers("Authorization") = "Bearer " & Mid(response, dosP, response.Length - dosP - 1)
+
+                                            Using requestStream = request.GetRequestStream
+                                                requestStream.Write(Encoding.UTF8.GetBytes(body), 0, body.Length)
+                                                requestStream.Close()
+
+                                                Using responseStream = request.GetResponse.GetResponseStream
+                                                    Using reader As New StreamReader(responseStream)
+                                                        response = reader.ReadToEnd()
+                                                    End Using
+                                                End Using
+                                            End Using
+                                        End If
+                                        mensajeGenerado = response = "" And Not mensajeGenerado
+                                        If mensajeGenerado Then
+                                            audiosGen = audiosGen + 1
+                                            agregarLOG("Mensaje enviado por chattigo. Mensaje: " & eMensaje, nroReporte, 9)
+                                        Else
+
+                                            audiosNGen = audiosNGen + 1
+                                            agregarLOG("Mensaje NO ENVIADO por chattigo. Respuesta de WS: " & response, nroReporte, 9)
+                                        End If
+                                    Catch ex As System.Net.WebException
+                                        agregarLOG("Servicio de chattigo: " & ex.Message,  , 9)
+                                        audiosNGen = audiosNGen + 1
+                                        miError = ex.Message
+                                    End Try
+                                End If
+                            Else
                                 For i = 0 To UBound(telefonos)
 
                                     If cliente = "HEB2" Then
@@ -255,7 +339,9 @@ Module basico
                                                 miError = ex.Message
                                             End Try
                                         End If
-                                    ElseIf cliente = "HEB" Then
+                                    ElseIf cliente = "HEB3" Then
+                                        Dim nReporte = 0
+                                        nReporte = ValNull(elmensaje!proceso, "N")
 
                                         Dim webService2 As String = ValNull(elmensaje!mmcall, "A")
                                         If webService2.Length > 0 Then
@@ -268,14 +354,14 @@ Module basico
 
                                                 If partesWS2(2).ToUpper = "WA" Then
                                                     Dim message2 = MessageResource.Create(from:=New Twilio.Types.PhoneNumber("whatsapp:" & partesWS2(3)), body:=eMensaje, to:=New Twilio.Types.PhoneNumber("whatsapp:" & telefonos(i)))
-                                                    agregarLOG("Servicio de Twilio: Mensaje de WhatsApp enviado", 0, 9)
+                                                    agregarLOG("Servicio de Twilio: Mensaje de WhatsApp enviado al numero " & telefonos(i) & " Reporte SIGMA: " & nReporte, 0, 9)
                                                     audiosGen = audiosGen + 1
                                                 ElseIf partesWS2(2).ToUpper = "SMS" Then
                                                     Dim toNumber = New PhoneNumber(telefonos(i))
                                                     Dim message = MessageResource.Create(
                                                 toNumber, from:=New PhoneNumber(partesWS2(4)),
                                                 body:=eMensaje)
-                                                    agregarLOG("Servicio de Twilio: SMS enviado", 0, 9)
+                                                    agregarLOG("Servicio de Twilio: SMS enviado al numero " & telefonos(i) & " Reporte SIGMA: " & nReporte, 0, 9)
                                                     audiosGen = audiosGen + 1
 
                                                 ElseIf partesWS2(2).ToUpper = "BOTH" Then
@@ -283,20 +369,16 @@ Module basico
                                                     Dim toNumber = New PhoneNumber(telefonos(i))
                                                     Dim message = MessageResource.Create(toNumber, from:=New PhoneNumber(partesWS2(4)),
                                                 body:=eMensaje)
-                                                    agregarLOG("Servicio de Twilio: Mensaje de WhatsApp enviado", 0, 9)
+                                                    agregarLOG("Servicio de Twilio: Mensaje de WhatsApp enviado al numero " & telefonos(i) & " Reporte SIGMA: " & nReporte, 0, 9)
                                                     audiosGen = audiosGen + 1
-                                                    agregarLOG("Servicio de Twilio: SMS enviado", 0, 9)
+                                                    agregarLOG("Servicio de Twilio: SMS enviado al numero " & telefonos(i) & " Reporte SIGMA: " & nReporte, 0, 9)
                                                     audiosGen = audiosGen + 1
                                                 Else
                                                     agregarLOG("Servicio de Twilio: Especifique el tipo de envío para este mensaje (WA, SMS o BOTH)", 0, 9)
                                                     audiosNGen = audiosNGen + 1
                                                 End If
-
-
-
-
                                             Catch ex As Exception
-                                                agregarLOG("Servicio de Twilio: " & ex.Message, 0, 9)
+                                                agregarLOG("Servicio de Twilio: Error al enviar al número " & telefonos(i) & " Reporte SIGMA: " & nReporte & ex.Message, 0, 9)
                                                 audiosNGen = audiosNGen + 1
                                                 miError = ex.Message
                                             End Try
@@ -304,13 +386,10 @@ Module basico
                                             agregarLOG("Servicio de Twilio: No hay datos para enviar por Twilio, configura el webservice de mmcall", 0, 9)
                                             audiosNGen = audiosNGen + 1
                                         End If
-
-
-                                        'Console.WriteLine(message.Sid)
                                     Else
-                                            Try
+                                        Try
 
-                                            Dim objWriter As New System.IO.StreamWriter(rutaSMS & "\" & telefonos(i) & Format(Now, "hhmmss") & i & ".txt", True)
+                                            Dim objWriter As New System.IO.StreamWriter(rutaSMS & "\" & telefonos(i) & Format(Now, "hhmmss") & IIf(nMensaje > 0, "~A" & nMensaje & "~", "") & i & ".txt", True)
                                             objWriter.WriteLine(eMensaje)
                                             objWriter.Close()
                                             audiosGen = audiosGen + 1
@@ -327,7 +406,7 @@ Module basico
                             End If
                         End If
                         cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
-                                            If optimizar Then
+                        If optimizar Then
                             If elmensaje!cuenta > 1 Then
                                 cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE canal = 1 AND lista = " & elmensaje!lista & " AND estatus = '" & idProceso & "'"
                                 If mantenerPrioridad Then
@@ -339,12 +418,98 @@ Module basico
                     Next
 
                     If audiosNGen > 0 Then
-                        agregarLOG("No se generaron " & audiosNGen & " mensaje(s) de texto")
+                        agregarLOG(traduccion(8).Replace("campo_0", audiosNGen))
                     End If
-                    ' agregarLOG("Se generaron " & audiosGen & " mensaje(s) de texto. Inicia ARDUINO")
-                    ' Shell(Application.StartupPath & "\arduino.exe " & Chr(34) & cadenaConexion & Chr(34), AppWinStyle.MinimizedNoFocus)
-                    'End If
                 End If
+
+                regsAfectados = consultaACT("UPDATE " & rutaBD & ".mensajes SET estatus = '" & idProceso & "' WHERE canal = 1 AND estatus = 'E' AND alerta = -1000")
+                cadSQL = "SELECT a.id, d.telefonos, 0, z.texto, z.titulo, 1 AS cuenta FROM " & rutaBD & ".mensajes a INNER JOIN " & rutaBD & ".mensajes_procesados z ON a.id = z.mensaje INNER JOIN " & rutaBD & ".cat_distribucion d ON a.lista = d.id AND d.estatus = 'A' WHERE a.estatus = '" & idProceso & "' AND a.alerta = -1000 ORDER BY a.prioridad DESC, a.id"
+                mensajesDS = consultaSEL(cadSQL)
+
+                If mensajesDS.Tables(0).Rows.Count > 0 Then
+                    For Each elmensaje In mensajesDS.Tables(0).Rows
+                        canales = ValNull(elmensaje!telefonos, "A")
+                        eMensaje = ValNull(elmensaje!texto, "A")
+                        If eMensaje.Length > 0 And canales.Length > 0 Then
+                            Dim antes As String = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç"
+                            Dim ahora As String = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc"
+                            For i = 0 To antes.Length - 1
+                                eMensaje = Replace(eMensaje, antes(i), ahora(i))
+                            Next
+                            eMensaje = Replace(eMensaje, ";", " ")
+                            eMensaje = Replace(eMensaje, "\", "-")
+                            eMensaje = Replace(eMensaje, "/", "-")
+
+                            eMensaje = Replace(eMensaje, System.Environment.NewLine, " ")
+                            eMensaje = Replace(eMensaje, "[90]", "")
+
+                            Dim telefonos As String()
+                            Dim tempArray As String()
+                            Dim totalItems = 0
+
+                            If canales.Length > 0 Then
+                                Dim arreCanales = canales.Split(New Char() {";"c})
+                                For i = LBound(arreCanales) To UBound(arreCanales)
+                                    If arreCanales(i).Length > 0 Then
+                                        'Redimensionamos el Array temporal y preservamos el valor  
+                                        ReDim Preserve telefonos(totalItems + i)
+                                        telefonos(totalItems + i) = arreCanales(i)
+                                    End If
+                                Next
+                                tempArray = telefonos
+                                totalItems = telefonos.Length
+
+                                Dim x As Integer, y As Integer
+                                Dim z As Integer
+                                For x = 0 To UBound(telefonos)
+                                    z = 0
+                                    For y = 0 To UBound(telefonos) - 1
+                                        'Si el elemento del array es igual al array temporal  
+                                        If telefonos(x) = tempArray(z) And y <> x Then
+                                            'Entonces Eliminamos el valor duplicado  
+                                            telefonos(y) = ""
+                                        End If
+                                        z = z + 1
+                                    Next y
+                                Next x
+                                canales = ""
+                            End If
+                            eMensaje = Microsoft.VisualBasic.Strings.Left(eMensaje, 120).Trim
+                            mensajeGenerado = False
+                            'heb/ se agrega el if del WS
+                            Dim validado As Boolean = True
+                            Dim url As String = ""
+                            Dim ws As String = ""
+                            Dim metodo As String = ""
+                            Dim ct As String = ""
+                            Dim autorizacion As String = ""
+                            Dim body As String = ""
+
+                            For i = 0 To UBound(telefonos)
+
+                                Try
+
+                                    Dim objWriter As New System.IO.StreamWriter(rutaSMS & "\" & telefonos(i) & Format(Now, "hhmmss") & IIf(nMensaje > 0, "~A" & nMensaje & "~", "") & i & ".txt", True)
+                                    objWriter.WriteLine(eMensaje)
+                                    objWriter.Close()
+                                    audiosGen = audiosGen + 1
+                                    mensajeGenerado = True
+                                Catch ex As Exception
+                                    audiosNGen = audiosNGen + 1
+                                    miError = ex.Message
+                                End Try
+                            Next
+                        End If
+                        cadSQL = "UPDATE " & rutaBD & ".mensajes SET estatus = 'Z', enviada = NOW() WHERE id = " & elmensaje!id
+                        regsAfectados = consultaACT(cadSQL)
+
+                    Next
+
+                    If audiosNGen > 0 Then
+                        agregarLOG(traduccion(8).Replace("campo_0", audiosNGen))
+                    End If
+                End If
+
             End If
         End If
         Application.Exit()
@@ -486,11 +651,11 @@ Module basico
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(4)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(5)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(6)
         End If
     End Function
 
@@ -509,6 +674,15 @@ Module basico
         'tipo 9: Error
         Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
     End Sub
-
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 4 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+    End Sub
 
 End Module

@@ -13,6 +13,7 @@ Module basico
     Public usuarioCerrar As String
     Public cadenaConexion As String
     Public rutaBD As String = "sigma"
+    Public traduccion As String()
 
     Public Function conexion() As MySqlConnection
         conexion = Nothing

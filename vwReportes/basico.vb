@@ -13,6 +13,8 @@ Module basico
     Public usuarioCerrar As String
     Public cadenaConexion As String
     Public rutaBD As String = "sigma"
+    Public traduccion As String()
+    Public be_idioma
 
 
     Public Function consultaACT(cadena As String) As Integer

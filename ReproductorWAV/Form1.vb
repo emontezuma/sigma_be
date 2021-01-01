@@ -38,11 +38,8 @@ Public Class Form1
         Dim argumentos As String() = Environment.GetCommandLineArgs()
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
-            XtraMessageBox.Show("SIGMA Monitor ya se está ejecutando en este equipo", "Sesión iniciada", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            XtraMessageBox.Show(traduccion(12), traduccion(13), MessageBoxButtons.OK, MessageBoxIcon.Error)
             Application.Exit()
-            'ElseIf argumentos.Length <= 1 Then
-            '    XtraMessageBox.Show("No se puede iniciar el monitor: Se requiere la cadena de conexión", "Sesión iniciada", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            '    Application.Exit()
         Else
             idProceso = Process.GetCurrentProcess.Id
             If argumentos.Length > 1 Then
@@ -85,13 +82,15 @@ Public Class Form1
             readerDS = consultaSEL(cadSQL)
             If readerDS.Tables(0).Rows.Count > 0 Then
                 Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+                be_idioma = ValNull(reader!idioma_defecto, "N")
+                etiquetas()
                 audios_externos = ValNull(reader!audios_externos, "A") = "S"
                 audios_externos_modo = ValNull(reader!audios_externos_modo, "N")
                 audios_externos_pausa = ValNull(reader!audios_externos_pausa, "N")
                 audios_externos_carpeta = ValNull(reader!audios_externos_carpeta, "A")
             End If
             If audios_externos Then
-                Me.Text = "Modo audios externos"
+                Me.Text = traduccion(6)
                 If audios_externos_carpeta.Length = 0 Then
                     audios_externos_carpeta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 Else
@@ -105,8 +104,9 @@ Public Class Form1
                         audios_externos_carpeta = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     End Try
                 End If
+                Me.Height = 315
             Else
-                Me.Text = "Modo generación de audios"
+                Me.Text = traduccion(7)
                 Try
 
                     Dim miReader As StreamReader = My.Computer.FileSystem.OpenTextFileReader(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) & "\rutadeaudo.txt")
@@ -129,19 +129,20 @@ Public Class Form1
                 End If
             End If
 
-            NotifyIcon1.Text = "Esperando por audios..."
+            NotifyIcon1.Text = traduccion(8)
             TextEdit16.Text = Ruta
             TextEdit3.Text = Segundos
             Timer1.Interval = Segundos * 1000
             Timer1.Enabled = True
             LabelControl1.Text = Timer1.Interval
-            TextEdit1.Text = "Carpeta: " & audios_externos_carpeta
+            TextEdit1.Text = traduccion(9) & audios_externos_carpeta
             TextEdit1.Visible = audios_externos
+
         End If
     End Sub
 
     Private Sub args_Showing(sender As Object, e As XtraMessageShowingArgs)
-        e.Buttons(DialogResult.OK).Text = "&Aceptar"
+        e.Buttons(DialogResult.OK).Text = traduccion(10)
         e.Buttons(DialogResult.OK).ImageOptions.Image = My.Resources.Resource1.close__2_
 
         e.Buttons(DialogResult.OK).ImageOptions.Location = ImageLocation.MiddleLeft
@@ -215,7 +216,7 @@ Public Class Form1
     End Sub
 
     Private Sub Timer1_Tick(sender As Object, e As EventArgs) Handles Timer1.Tick
-        NotifyIcon1.Text = "Reproduciendo..."
+        NotifyIcon1.Text = traduccion(11)
         If Cargando Then Exit Sub
         Cargando = True
         ' Listen for the LoadCompleted event.
@@ -345,10 +346,30 @@ Public Class Form1
             End Try
 
 
-            For Each foundFile As String In My.Computer.FileSystem.GetFiles(
-  LaRuta, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.wav")
+            Dim files = My.Computer.FileSystem.GetFiles(LaRuta, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.wav")
+
+            Dim filessorted As List(Of String) = (From item In files
+                                                  Let file = New FileInfo(item)
+                                                  Order By file.CreationTime
+                                                  Select item).ToList()
+
+            For Each foundFile As String In filessorted
                 Try
                     Dim miArchivo = New IO.FileInfo(foundFile).Name
+                    If Strings.InStr(foundFile, "~R") > 0 Then
+                        Dim iniCad = Strings.InStr(foundFile, "~R")
+                        Dim finCad = Strings.InStr(iniCad + 2, foundFile, "~")
+                        Dim numeroMensaje = Strings.Mid(foundFile, iniCad + 2, finCad - iniCad - 2)
+                        Dim general = consultaSEL("SELECT estatus FROM " & rutaBD & ".reportes WHERE id = " & Val(numeroMensaje))
+                        If general.Tables(0).Rows.Count > 0 Then
+                            If ValNull(general.Tables(0).Rows(0)!estatus, "N") > 0 Then
+                                'La alarma fue cancelada, eliminar el archivo
+                                File.Delete(foundFile)
+                                File.Delete(foundFile)
+                                Continue For
+                            End If
+                        End If
+                    End If
                     If Strings.Left(miArchivo, 9) = "audio_def" Then
                         Dim fs As FileStream = New FileStream(foundFile, FileMode.Open, FileAccess.Read)
                         Dim sp As System.Media.SoundPlayer = New System.Media.SoundPlayer(fs)
@@ -368,7 +389,7 @@ Public Class Form1
 
         End If
 
-        NotifyIcon1.Text = "Esperando por audios..."
+        NotifyIcon1.Text = traduccion(8)
         Cargando = False
     End Sub
 
@@ -394,4 +415,27 @@ Public Class Form1
         Loop
     End Sub
 
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 6 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+        LabelControl2.Text = traduccion(0)
+        GroupControl5.Text = traduccion(1)
+        LabelControl27.Text = traduccion(2)
+        LabelControl3.Text = traduccion(3)
+        SimpleButton1.Text = traduccion(4)
+        SimpleButton2.Text = traduccion(5)
+
+    End Sub
+
+    Private Sub Form1_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        If XtraMessageBox.Show(traduccion(14), traduccion(15), MessageBoxButtons.YesNo, MessageBoxIcon.Stop) = DialogResult.No Then
+            e.Cancel = True
+        End If
+    End Sub
 End Class

@@ -24,6 +24,10 @@ Public Class Form1
     Dim idProceso As String
     Dim be_log_activar As Boolean
     Dim contador As Integer = 0
+    Dim be_idioma As Integer
+    Dim rutaAudios
+    Dim rutaSMS
+
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
@@ -32,26 +36,23 @@ Public Class Form1
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
         ElseIf argumentos.Length <= 1 Then
-            MsgBox("No se puede iniciar el envío de correos: Se requiere la cadena de conexión", MsgBoxStyle.Critical, "SIGMA Monitor")
+            MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
             cadenaConexion = argumentos(1)
             contador = contador + 1
-            TextBox1.Text = contador & ") Se inicia la interfaz telefónica con la cadena de conexión " & cadenaConexion & vbCrLf & TextBox1.Text
-
             'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
             Dim idProceso = Process.GetCurrentProcess.Id
 
             idProceso = Process.GetCurrentProcess.Id
 
             estadoPrograma = True
+
             generarLlamadas()
         End If
         Application.Exit()
     End Sub
 
     Private Sub generarLlamadas()
-        Dim rutaAudios
-        Dim rutaSMS
         Dim ptoCOMM1 As String = "", ptoCOMM2 As String = "", ptoCOMM3 As String = "", ptoCOMM4 As String = "", ptoCOMM5 As String = "", ptoCOMM6 As String = ""
         Dim ptoCOMM1P As String = "", ptoCOMM2P As String = "", ptoCOMM3P As String = "", ptoCOMM4P As String = "", ptoCOMM5P As String = "", ptoCOMM6P As String = ""
         Dim escape_veces = 3
@@ -68,7 +69,10 @@ Public Class Form1
         Dim readerDS As DataSet = consultaSEL(cadSQL)
 
         If readerDS.Tables(0).Rows.Count > 0 Then
+
             Dim reader As DataRow = readerDS.Tables(0).Rows(0)
+            be_idioma = ValNull(reader!idioma_defecto, "N")
+            etiquetas()
             ptoCOMM1 = ValNull(reader!puerto_comm1, "A")
             ptoCOMM1P = ValNull(reader!puerto_comm1_par, "A")
             ptoCOMM2 = ValNull(reader!puerto_comm2, "A")
@@ -100,13 +104,13 @@ Public Class Form1
             escape_mensaje_propio = ValNull(reader!escape_mensaje_propio, "A") = "S"
         ElseIf Not errorPuerto Then
             errorPuerto = True
-            agregarLOG("No se ha configurado la interacción con Arduino, por favor configure la aplicación e intente de nuevo", 0, 9)
+            agregarLOG("Arduino application is not set", 0, 9)
             Exit Sub
         End If
 
         If be_alarmas_llamadas Or be_alarmas_sms Then
             contador = contador + 1
-            TextBox1.Text = contador & ") Activado una llamada/SMS" & vbCrLf & TextBox1.Text
+            TextBox1.Text = contador & ") " & traduccion(5) & vbCrLf & TextBox1.Text
             If rutaSMS.Length = 0 Then
                 rutaSMS = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             Else
@@ -125,13 +129,13 @@ Public Class Form1
                 rutaAudios = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             End If
             contador = contador + 1
-            TextBox1.Text = contador & ") Ruta de audios: " & rutaAudios & vbCrLf & TextBox1.Text
+            TextBox1.Text = contador & ") " & traduccion(6) & rutaAudios & vbCrLf & TextBox1.Text
             contador = contador + 1
-            TextBox1.Text = contador & ") Ruta de SMS: " & rutaSMS & vbCrLf & TextBox1.Text
-
+            TextBox1.Text = contador & ") " & traduccion(8) & rutaSMS & vbCrLf & TextBox1.Text
+            eliminarArchivosAntiguos()
             If ptoCOMM1.Length = 0 And ptoCOMM2.Length = 0 And ptoCOMM3.Length = 0 And ptoCOMM4.Length = 0 And ptoCOMM5.Length = 0 And ptoCOMM6.Length = 0 Then
                 If Not errorPuerto Then
-                    agregarLOG("No se ha configurado ningún puerto de comunicaciones para la interacción con Arduino, por favor configure la aplicación e intente de nuevo", 0, 9)
+                    agregarLOG(traduccion(7), 0, 9)
                     errorPuerto = True
                     Exit Sub
                 End If
@@ -139,7 +143,7 @@ Public Class Form1
             If ptoCOMM1P.Length = 0 And ptoCOMM2P.Length = 0 And ptoCOMM3P.Length = 0 And ptoCOMM4P.Length = 0 And ptoCOMM5P.Length = 0 And ptoCOMM6P.Length = 0 Then
                 If Not errorPuerto Then
                     errorPuerto = True
-                    agregarLOG("No se ha configurado ningún puerto de comunicaciones para la interacción con Arduino, por favor configure la aplicación e intente de nuevo", 0, 9)
+                    agregarLOG(traduccion(7), 0, 9)
                     Exit Sub
                 End If
             End If
@@ -165,36 +169,45 @@ Public Class Form1
             Next
             If LlamadasPendientes > 0 And be_alarmas_llamadas Then
                 contador = contador + 1
-                TextBox1.Text = contador & ") Se encontraron " & LlamadasPendientes & " audios" & vbCrLf & TextBox1.Text
+                TextBox1.Text = contador & ") " & LlamadasPendientes & traduccion(9) & vbCrLf & TextBox1.Text
 
                 Dim iniLlamadas = DateTime.Now
                 'Dim Comando As OdbcCommand = New OdbcCommand(CadSQL)
                 If Not ValPuerto(ptoCOMM1, ptoCOMM1P) Then
                     contador = contador + 1
-                    TextBox1.Text = contador & ") No se puede accder al puerto " & ptoCOMM1 & " " & ptoCOMM1P & vbCrLf & TextBox1.Text
+                    TextBox1.Text = contador & ") " & traduccion(10) & ptoCOMM1 & " " & ptoCOMM1P & vbCrLf & TextBox1.Text
 
-                    agregarLOG("Puerto:" & ptoCOMM1 & " parámetros: " & ptoCOMM1P & ". No se emitieron " & LlamadasPendientes & " llamada(s). Error: " & ptoError, 0, 2)
+                    agregarLOG(traduccion(14) & ptoCOMM1 & traduccion(11) & ptoCOMM1P & ". " & traduccion(12) & LlamadasPendientes & traduccion(13) & ptoError, 0, 2)
                 Else
 
-                    For Each FoundFile As String In My.Computer.FileSystem.GetFiles(
-          rutaAudios, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.wav")
+                    Dim files = My.Computer.FileSystem.GetFiles(rutaAudios, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.wav")
+
+                    Dim filessorted As List(Of String) = (From item In files
+                                                          Let file = New FileInfo(item)
+                                                          Order By file.CreationTime
+                                                          Select item).ToList()
+
+                    For Each foundFile As String In filessorted
                         If My.Computer.FileSystem.FileExists(FoundFile) Then
                             If Not estadoPrograma Then
                                 Exit Sub
                             End If
+                            'Se debe validar si el mensaje es pertinente
+
+                            Dim cadenaTrad = ""
                             Try
                                 If Not SerialPort1.IsOpen Then
                                     SerialPort1.Open()
                                 End If
                                 'ReceiveSerialData()
-                                Dim Numero = Microsoft.VisualBasic.Strings.Left(Path.GetFileName(FoundFile), 10)
-                                Dim nombreArchivo = Path.GetFileName(FoundFile)
+                                Dim Numero = Microsoft.VisualBasic.Strings.Left(Path.GetFileName(foundFile), 10)
+                                Dim nombreArchivo = Path.GetFileName(foundFile)
                                 contador = contador + 1
-                                TextBox1.Text = contador & ") se encontró audio para el número " & Numero & vbCrLf & TextBox1.Text
+                                TextBox1.Text = contador & ") " & traduccion(15) & Numero & vbCrLf & TextBox1.Text
 
                                 If IsNumeric(Numero) Then
                                     contador = contador + 1
-                                    TextBox1.Text = contador & ") se inicia llamada a través de la interfaz telefónica" & Numero & vbCrLf & TextBox1.Text
+                                    TextBox1.Text = contador & ") " & traduccion(16) & Numero & vbCrLf & TextBox1.Text
 
                                     Try
                                         contador = contador + 1
@@ -220,8 +233,8 @@ Public Class Form1
                                             Dim TotalSegundos = TiempoFinal - TiempoInicial
                                             If TotalSegundos.Seconds >= LimiteTimeout Then
                                                 contador = contador + 1
-                                                TextBox1.Text = contador & ") SE CANCELA POR TIMEOUT'" & vbCrLf & TextBox1.Text
-                                                MensajeLlamada = "timeout"
+                                                TextBox1.Text = contador & ") " & traduccion(17) & '" & vbCrLf & TextBox1.Text
+                                            MensajeLlamada = "timeout"
                                                 Salir = True
                                             ElseIf MensajeLlamada.Length > 0 Then
                                                 If Microsoft.VisualBasic.Strings.InStr(MensajeLlamada, "CONNECTED") > 0 Then
@@ -240,30 +253,30 @@ Public Class Form1
                                                 'Controlar las llamadas
 
                                                 Dim eliminado = False
-                                                If escape_veces <= 1 And Microsoft.VisualBasic.Strings.InStr(FoundFile, "_1.wav") > 0 Then
-                                                    eliminarArchivo(FoundFile)
+                                                If escape_veces <= 1 And Microsoft.VisualBasic.Strings.InStr(foundFile, "_1.wav") > 0 Then
+                                                    eliminarArchivo(foundFile)
                                                     eliminado = True
-                                                ElseIf escape_veces <= 2 And Microsoft.VisualBasic.Strings.InStr(FoundFile, "_2.wav") > 0 Then
-                                                    eliminarArchivo(FoundFile)
+                                                ElseIf escape_veces <= 2 And Microsoft.VisualBasic.Strings.InStr(foundFile, "_2.wav") > 0 Then
+                                                    eliminarArchivo(foundFile)
                                                     eliminado = True
-                                                ElseIf escape_veces <= 3 And Microsoft.VisualBasic.Strings.InStr(FoundFile, "_3.wav") > 0 Then
-                                                    eliminarArchivo(FoundFile)
+                                                ElseIf escape_veces <= 3 And Microsoft.VisualBasic.Strings.InStr(foundFile, "_3.wav") > 0 Then
+                                                    eliminarArchivo(foundFile)
                                                     eliminado = True
-                                                ElseIf escape_veces <= 4 And Microsoft.VisualBasic.Strings.InStr(FoundFile, "_4.wav") > 0 Then
-                                                    eliminarArchivo(FoundFile)
+                                                ElseIf escape_veces <= 4 And Microsoft.VisualBasic.Strings.InStr(foundFile, "_4.wav") > 0 Then
+                                                    eliminarArchivo(foundFile)
                                                     eliminado = True
-                                                ElseIf escape_veces <= 5 And Microsoft.VisualBasic.Strings.InStr(FoundFile, "_5.wav") > 0 Then
-                                                    eliminarArchivo(FoundFile)
+                                                ElseIf escape_veces <= 5 And Microsoft.VisualBasic.Strings.InStr(foundFile, "_5.wav") > 0 Then
+                                                    eliminarArchivo(foundFile)
                                                     eliminado = True
                                                 End If
                                                 If Not eliminado Then
-                                                    newFile = FoundFile
+                                                    newFile = foundFile
                                                     newFile = Microsoft.VisualBasic.Strings.Replace(newFile, "_4", "_5")
                                                     newFile = Microsoft.VisualBasic.Strings.Replace(newFile, "_3", "_4")
                                                     newFile = Microsoft.VisualBasic.Strings.Replace(newFile, "_2", "_3")
                                                     newFile = Microsoft.VisualBasic.Strings.Replace(newFile, "_1", "_2")
-                                                    My.Computer.FileSystem.RenameFile(FoundFile, Path.GetFileName(newFile))
-                                                    agregarLOG("Se hizo una llamada sin respuesta al repositorio: " & Numero, 0, 2)
+                                                    My.Computer.FileSystem.RenameFile(foundFile, Path.GetFileName(newFile))
+                                                    agregarLOG(traduccion(18) & Numero, 0, 2)
                                                 ElseIf escape_accion = "E" Then
                                                     'Se escapa la llamada
                                                     If escape_lista > 0 Then
@@ -274,7 +287,7 @@ Public Class Form1
                                                         Try
                                                             System.IO.File.Create(rutaSMS & "\" & Numero & Format(Now, "hhmmss") & "9999" & ".txt").Dispose()
                                                             Dim objWriter As New System.IO.StreamWriter(rutaSMS & "\" & Numero & Format(Now, "hhmmss") & "9999" & ".txt", True)
-                                                            escape_mensaje = "Se agotó el número de intentos de llamada para el teléfono " & Numero
+                                                            escape_mensaje = traduccion(19) & Numero
                                                             Dim antes As String = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç"
                                                             Dim ahora As String = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc"
                                                             For i = 0 To antes.Length - 1
@@ -294,8 +307,8 @@ Public Class Form1
                                             End If
                                         Else
                                             contador = contador + 1
-                                            TextBox1.Text = contador & ") REPRODUCIENDO AUDIOS" & vbCrLf & TextBox1.Text
-                                            Dim fs As FileStream = New FileStream(FoundFile, FileMode.Open, FileAccess.Read)
+                                            TextBox1.Text = contador & ") " & traduccion(20) & vbCrLf & TextBox1.Text
+                                            Dim fs As FileStream = New FileStream(foundFile, FileMode.Open, FileAccess.Read)
                                             Dim sp As System.Media.SoundPlayer = New System.Media.SoundPlayer(fs)
                                             For i = 0 To veces_reproducir - 1
                                                 sp.PlaySync()
@@ -304,9 +317,9 @@ Public Class Form1
                                             Salir = False
                                             TiempoInicial = DateTime.Now
                                             Dim TiempoFinal = DateTime.Now
-                                            Do While Not Salir And My.Computer.FileSystem.FileExists(FoundFile)
+                                            Do While Not Salir And My.Computer.FileSystem.FileExists(foundFile)
                                                 'Se cuentan hasta 30seg
-                                                eliminarArchivo(FoundFile)
+                                                eliminarArchivo(foundFile)
                                                 TiempoFinal = DateTime.Now
                                                 Dim TotalSegundos = TiempoFinal - TiempoInicial
                                                 If TotalSegundos.Seconds > 1 Then
@@ -314,9 +327,9 @@ Public Class Form1
                                                 End If
                                             Loop
                                             If Salir Then
-                                                agregarLOG("Se hizo una llamada, se reprodujo un audio pero no se eliminó correctamente el archivo...", 0, 9)
+                                                agregarLOG(traduccion(21), 0, 9)
                                             Else
-                                                agregarLOG("Se acaba de realizar una llamada satisfactoria al repositorio : " & Numero)
+                                                agregarLOG(traduccion(22) & Numero)
                                             End If
                                         End If
                                     Catch ex As Exception
@@ -329,7 +342,7 @@ Public Class Form1
                     Next
                     Dim tSegundos = DateTime.Now - iniLlamadas
 
-                    agregarLOG("Se procesaron " & LlamadasPendientes & " llamada(s) de voz en " & tSegundos.Seconds & " segundo(s)...")
+                    agregarLOG(LlamadasPendientes & traduccion(23) & tSegundos.Seconds & traduccion(24))
 
                 End If
             End If
@@ -342,19 +355,27 @@ Public Class Form1
             Next
             If LlamadasPendientes > 0 And be_alarmas_sms Then
                 contador = contador + 1
-                TextBox1.Text = contador & ") Se encontraron " & LlamadasPendientes & " SMS" & vbCrLf & TextBox1.Text
+                TextBox1.Text = contador & ") " & LlamadasPendientes & traduccion(25) & vbCrLf & TextBox1.Text
                 Dim iniLlamadas = DateTime.Now
 
                 If Not ValPuerto(ptoCOMM1, ptoCOMM1P) Then
-                    agregarLOG("Puerto:" & ptoCOMM1 & " parámetros: " & ptoCOMM1P & ". No se emitieron " & LlamadasPendientes & " SMS. Error: " & ptoError, 0, 2)
+                    agregarLOG(traduccion(14) & ptoCOMM1 & traduccion(11) & ptoCOMM1P & ". " & traduccion(26) & LlamadasPendientes & traduccion(27) & ptoError, 0, 2)
                 Else
 
-                    For Each FoundFile As String In My.Computer.FileSystem.GetFiles(
-          rutaSMS, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.txt")
+
+                    Dim files = My.Computer.FileSystem.GetFiles(rutaSMS, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.txt")
+                    Dim filessorted As List(Of String) = (From item In files
+                                                          Let file = New FileInfo(item)
+                                                          Order By file.CreationTime
+                                                          Select item).ToList()
+
+                    For Each FoundFile As String In filessorted
                         If Not estadoPrograma Then
                             Exit Sub
                         End If
                         If My.Computer.FileSystem.FileExists(FoundFile) Then
+                            'Se debe validar si el mensaje es pertinente
+
                             Try
                                 If Not SerialPort1.IsOpen Then
                                     SerialPort1.Open()
@@ -391,12 +412,12 @@ Public Class Form1
                                                 Dim TotalSegundos = TiempoFinal - TiempoInicial
                                                 If TotalSegundos.Seconds >= LimiteTimeout Then
                                                     contador = contador + 1
-                                                    TextBox1.Text = contador & ") SE CANCELA POR TIMEOUT DE SMS'" & vbCrLf & TextBox1.Text
+                                                    TextBox1.Text = contador & ") " & traduccion(28) & "'" & vbCrLf & TextBox1.Text
 
                                                     MensajeLlamada = "timeout"
                                                     Salir = True
                                                 ElseIf MensajeLlamada.Length > 0 Then
-                                                    If Microsoft.VisualBasic.Strings.InStr(MensajeLlamada, "OK") Or Microsoft.VisualBasic.Strings.InStr(MensajeLlamada, "finalizada") Then
+                                                    If Microsoft.VisualBasic.Strings.InStr(MensajeLlamada, "OK") Or Microsoft.VisualBasic.Strings.InStr(MensajeLlamada, traduccion(29)) Then
                                                         Salir = True
                                                     Else
                                                         Salir = True
@@ -409,9 +430,9 @@ Public Class Form1
                                                 escaparSMS(Numero)
                                             Else
                                                 contador = contador + 1
-                                                TextBox1.Text = contador & ") SE ENVIA SMS'" & vbCrLf & TextBox1.Text
+                                                TextBox1.Text = contador & ") " & traduccion(30) & "'" & vbCrLf & TextBox1.Text
 
-                                                agregarLOG("Se envío en mensaje de texto correctamente al repositorio: " & Numero, 1, 0)
+                                                agregarLOG(traduccion(31) & Numero, 1, 0)
                                             End If
                                             eliminarArchivo(FoundFile)
                                         Catch ex As Exception
@@ -429,13 +450,13 @@ Public Class Form1
                     Next
                     Dim tSegundos = DateTime.Now - iniLlamadas
 
-                    agregarLOG("Se procesaron " & LlamadasPendientes & " mensaje(s) de texto (SMS) en " & tSegundos.Seconds & " segundo(s)...")
+                    agregarLOG(LlamadasPendientes & traduccion(32) & tSegundos.Seconds & traduccion(24))
 
                 End If
             End If
         Else
             contador = contador + 1
-            TextBox1.Text = contador & ") No estan activo llamada/SMS" & vbCrLf & TextBox1.Text
+            TextBox1.Text = contador & ") " & traduccion(33) & vbCrLf & TextBox1.Text
 
         End If
     End Sub
@@ -495,11 +516,11 @@ Public Class Form1
     Function calcularTiempo(Seg) As String
         calcularTiempo = ""
         If Seg < 60 Then
-            calcularTiempo = Seg & " seg"
+            calcularTiempo = Seg & traduccion(37)
         ElseIf Seg < 3600 Then
-            calcularTiempo = Math.Round(Seg / 60, 1) & " min"
+            calcularTiempo = Math.Round(Seg / 60, 1) & traduccion(38)
         Else
-            calcularTiempo = Math.Round(Seg / 3600, 1) & " hr"
+            calcularTiempo = Math.Round(Seg / 3600, 1) & traduccion(39)
         End If
     End Function
 
@@ -534,11 +555,11 @@ Public Class Form1
 
 
     Sub escaparLlamada(numero)
-        agregarLOG("Se agotó el número de intentos de llamada de voz al repositorio: " & numero, 0, 2)
+        agregarLOG(traduccion(34) & numero, 0, 2)
     End Sub
 
     Sub escaparSMS(numero)
-        agregarLOG("Se agotó el número de intentos de envio de SMS al repositorio: " & numero, 0, 2)
+        agregarLOG(traduccion(35) & numero, 0, 2)
     End Sub
 
     Private Sub SerialPort1_DataReceived(sender As Object, e As SerialDataReceivedEventArgs) Handles SerialPort1.DataReceived
@@ -579,5 +600,82 @@ Public Class Form1
 
     Private Sub Button3_Click(sender As Object, e As EventArgs) Handles Button3.Click
         Application.Exit()
+    End Sub
+
+    Sub etiquetas()
+        Dim general = consultaSEL("SELECT cadena FROM " & rutaBD & ".det_idiomas_back WHERE idioma = " & IIf(be_idioma = 0, 1, be_idioma) & " AND modulo = 1 ORDER BY linea")
+        Dim cadenaTrad = ""
+        If general.Tables(0).Rows.Count > 0 Then
+            For Each cadena In general.Tables(0).Rows
+                cadenaTrad = cadenaTrad & cadena!cadena
+            Next
+        End If
+        traduccion = cadenaTrad.Split(New Char() {";"c})
+        TextBox1.Text = contador & ") " & traduccion(4) & cadenaConexion & vbCrLf & TextBox1.Text
+        Label1.Text = traduccion(0)
+        Button1.Text = traduccion(1)
+    End Sub
+
+    Sub eliminarArchivosAntiguos()
+        For Each FoundFile As String In My.Computer.FileSystem.GetFiles(
+      rutaAudios, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.wav")
+            Dim Numero = Microsoft.VisualBasic.Strings.Left(Path.GetFileName(FoundFile), 10)
+            Dim nombreArchivo = Path.GetFileName(FoundFile)
+            If IsNumeric(Numero) Then
+                Dim revisarEliminar = False
+                'Se debe validar si el mensaje es pertinente
+                If Strings.InStr(FoundFile, "~A") > 0 Then
+                    Dim iniCad = Strings.InStr(FoundFile, "~A")
+                    Dim finCad = Strings.InStr(iniCad + 2, FoundFile, "~")
+                    Dim numeroMensaje = Strings.Mid(FoundFile, iniCad + 2, finCad - iniCad - 2)
+                    Dim general = consultaSEL("SELECT estatus FROM " & rutaBD & ".alarmas WHERE id = " & Val(numeroMensaje))
+                    If general.Tables(0).Rows.Count > 0 Then
+                        If ValNull(general.Tables(0).Rows(0)!estatus, "N") = 9 Then
+                            eliminarArchivo(FoundFile)
+                        End If
+                    Else
+                        revisarEliminar = True
+                    End If
+                Else
+                    revisarEliminar = True
+                End If
+                If revisarEliminar Then
+                    Dim fileCreatedDate As DateTime = File.GetCreationTime(FoundFile)
+                    If DateAndTime.DateDiff(DateInterval.Second, fileCreatedDate, DateAndTime.Now) > 300 Then
+                        eliminarArchivo(FoundFile)
+                    End If
+                End If
+            End If
+        Next
+        For Each FoundFile As String In My.Computer.FileSystem.GetFiles(
+      rutaSMS, Microsoft.VisualBasic.FileIO.SearchOption.SearchTopLevelOnly, "*.txt")
+            Dim Numero = Microsoft.VisualBasic.Strings.Left(Path.GetFileName(FoundFile), 10)
+            Dim nombreArchivo = Path.GetFileName(FoundFile)
+            If IsNumeric(Numero) Then
+                Dim revisarEliminar = False
+                'Se debe validar si el mensaje es pertinente
+                If Strings.InStr(FoundFile, "~A") > 0 Then
+                    Dim iniCad = Strings.InStr(FoundFile, "~A")
+                    Dim finCad = Strings.InStr(iniCad + 2, FoundFile, "~")
+                    Dim numeroMensaje = Strings.Mid(FoundFile, iniCad + 2, finCad - iniCad - 2)
+                    Dim general = consultaSEL("SELECT estatus FROM " & rutaBD & ".alarmas WHERE id = " & Val(numeroMensaje))
+                    If general.Tables(0).Rows.Count > 0 Then
+                        If ValNull(general.Tables(0).Rows(0)!estatus, "N") = 9 Then
+                            eliminarArchivo(FoundFile)
+                        End If
+                    Else
+                        revisarEliminar = True
+                    End If
+                Else
+                    revisarEliminar = True
+                End If
+                If revisarEliminar Then
+                    Dim fileCreatedDate As DateTime = File.GetCreationTime(FoundFile)
+                    If DateAndTime.DateDiff(DateInterval.Second, fileCreatedDate, DateAndTime.Now) > 300 Then
+                        eliminarArchivo(FoundFile)
+                    End If
+                End If
+            End If
+        Next
     End Sub
 End Class
