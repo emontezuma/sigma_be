@@ -6,29 +6,31 @@ Imports System.IO
 Imports System.Data
 Imports System.Net.Mail
 Imports System.Net
+Imports System.Timers
 
 Module basico
     Public errorBD As String
     Public horaDesde As DateTime
-    Public ultimaFalla
+    Public ultimaFallu
     Public autenticado As Boolean
     Public cadenaConexion As String
     Public be_log_activar As Boolean = False
     Public rutaBD As String = "sigma"
+    'Public rutaBD As String = "sigma_nueva"
     Public traduccion As String()
     Public be_idioma
-
-
+    Public par1 As Long, par2 As Long, par3 As Long
     Sub Main(argumentos As String())
 
         'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True;Allow User Variables=True"
-        'reporteHoraxHora(3, 0)
+        'reporteHoraxHora(1, 54, 1)
 
         If Process.GetProcessesByName _
-          (Process.GetCurrentProcess.ProcessName).Length > 1 Then
+          (Process.GetCurrentProcess.ProcessName).Length > 1    Then
         ElseIf argumentos.Length = 0 Then
             MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
+            'MsgBox("Entro 1")
             cadenaConexion = argumentos(0)
             If argumentos.Length = 2 Then
                 If argumentos(1) = "test" Then
@@ -42,13 +44,18 @@ Module basico
                         'reporteOEEporTurno(3)
                     ElseIf arreParametros(0) = "hxh_por_turno" Or arreParametros(0) = "hxh_por_hora" Or arreParametros(0) = "hxh_por_dia" Then
                         agregarLOG("Reporte a ejecutar: " & arreParametros(0), 9, 0)
+                        'MsgBox("Entro 2")
                         Dim parametro = 1
                         If arreParametros(0) = "hxh_por_hora" Then
                             parametro = 2
                         ElseIf arreParametros(0) = "hxh_por_dia" Then
                             parametro = 3
                         End If
-                        reporteHoraxHora(parametro, Val(arreParametros(1)))
+                        par1 = parametro
+                        par2 = Val(arreParametros(1))
+                        par3 = Val(arreParametros(2))
+                        'Msgbox("Entro al reporte de hora por hora")
+                        reporteHoraxHora(par1, par2, par3)
                     End If
                 End If
             Else
@@ -112,12 +119,12 @@ Module basico
                     separador_mail = ValNull(reader!separador_mail, "A")
                 End If
                 If separador_mail = "" Then separador_mail = ";"
-                If correo_firma.Length = 0 Then
-                    correo_firma = traduccion(0)
-                End If
-                If correo_titulo.Length = 0 Then
-                    correo_titulo = traduccion(1)
-                End If
+                'If correo_firma.Length = 0 Then
+                ' correo_firma = traduccion(0)
+                ' End If
+                'If correo_titulo.Length = 0 Then
+                ' correo_titulo = traduccion(1)
+                'End If
 
                 If be_alarmas_correos Then
 
@@ -646,11 +653,11 @@ Module basico
     End Function
 
     Private Sub agregarLOG(cadena As String, Optional reporte As Integer = 0, Optional tipo As Integer = 0, Optional aplicacion As Integer = 40)
-        If Not be_log_activar Then Exit Sub
+        'If Not be_log_activar Then Exit Sub
         'tipo 0: Info
         'tipo 2: Advertencia
         'tipo 9: Error
-        Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
+        'Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
     End Sub
 
     Sub etiquetas()
@@ -846,13 +853,14 @@ Module basico
         End If
     End Sub
 
-    Sub reporteHoraxHora(tipo As Integer, secuencia As Long)
+    Sub reporteHoraxHora(tipo As Integer, secuencia As Long, turno As Long)
 
         Dim cadSQL As String = "SELECT correo_cuenta, correo_clave, correo_puerto, correo_ssl, correo_host, oee_por_turno_cuentas_hxh, oee_por_turno_cuentas_hxh_turno, oee_por_turno_cuentas_hxh_dia, ruta_archivos_enviar FROM " & rutaBD & ".configuracion"
         Dim readerDS As DataSet = consultaSEL(cadSQL)
         Dim escape_mensaje = ""
 
         If readerDS.Tables(0).Rows.Count > 0 Then
+            'Msgbox("Hallo datos de configurcion")
             Dim reader As DataRow = readerDS.Tables(0).Rows(0)
             Dim correo_cuenta As String = ValNull(reader!correo_cuenta, "A")
             Dim correo_clave As String = ValNull(reader!correo_clave, "A")
@@ -866,7 +874,7 @@ Module basico
             ElseIf tipo = 3 Then
                 listaCorreos = ValNull(reader!oee_por_turno_cuentas_hxh_dia, "A")
             End If
-            listaCorreos = "sistemas@cronosintegracion.com;elvismontezuma@hotmail.com"
+            'listaCorreos = "elvismontezuma@hotmail.com"
             Dim smtpServer As New SmtpClient()
 
             If rutaFiles.Length = 0 Then
@@ -931,22 +939,40 @@ Module basico
                     End If
                 Next i
 
-                Dim cadTitulos = "Secuencia,Ruptura,Fecha,Equipo/Máquina,Orden/Lote,Número de parte,Turno,Hora,Inicia,Termina,Tiempo disponible efectivo,Tiempo de paro efectivo,Tiempo ciclo estimado (seg),Plan,Acumulado,Piezas OK,Piezas No OK,Producción (OK y no OK),Diferencia (Plan versus real),Adherencia al plan (%),Producción de la hora anterior,Rendimiento (OEE),Calidad (OEE),Disponibilidad (OEE),OEE,Tiempo ciclo real (seg),Diferencia en la hora anterior,Plan automatico (S/N),Tripulación,Comentarios,Causa principal de la desviación (si aplica),Responsable de la desviación (1),Responsable de la desviación (2)"
+                Dim miTurno = ""
+
+                cadSQL = "SELECT nombre FROM " & rutaBD & ".cat_turnos WHERE id = " & turno
+                Dim general As DataSet = consultaSEL(cadSQL)
+                If general.Tables(0).Rows.Count > 0 Then
+                    miTurno = ValNull(general.Tables(0).Rows(0)!nombre, "A")
+                End If
+
+
+                Dim cadTitulos = "Secuencia,Ruptura,Fecha,Equipo/Máquina,Orden/Lote,Número de parte,Turno,Hora,Inicia,Termina,Tiempo disponible efectivo,Tiempo de paro efectivo,Tiempo ciclo estimado (seg),Plan,Acumulado,Piezas OK,Piezas No OK,Producción (OK y no OK),Diferencia (Plan versus real),Adherencia al plan (%),Producción de la hora anterior,Rendimiento (OEE),FTQ (OEE),Disponibilidad (OEE),OEE,Scrap manual,Tiempo ciclo real (seg),Diferencia en la hora anterior,Plan automatico (S/N),Tripulación,Comentarios,Causa principal de la desviación (si aplica),Responsable de la desviación (1),Responsable de la desviación (2)"
 
                 Dim CadenaMail = ""
-                Dim horaAnterior = DateAdd(DateInterval.Hour, -1, Now())
                 Dim diaAnterior = DateAdd(DateInterval.Day, -1, Now())
+                Dim horaAnterior = DateAdd(DateInterval.Hour, -1, Now())
+
                 Dim archivoEnv = "reporteOEE_turno"
+                Dim filtroTurno = " AND a.secuencia = " & secuencia
+                If turno = 2 Then
+                    filtroTurno = " AND a.secuencia >= " & secuencia - 1
+                ElseIf turno = 3 Then
+                    filtroTurno = " AND a.secuencia >= " & secuencia - 2
+                End If
+
                 If tipo = 1 Then
-                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)" & vbCrLf & vbCrLf
-                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.secuencia = " & secuencia & " ORDER BY a.dia, a.hora, a.id"
-                ElseIf tipo = 2 Then
-                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por hora)" & vbCrLf & vbCrLf
-                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(horaAnterior, "yyyy/MM/dd") & "' AND hora = " & Val(Format(horaAnterior, "HH")) & " ORDER BY a.dia, a.hora, a.id"
+                    filtroTurno = " AND a.secuencia = " & secuencia
+                End If
+
+                cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus = 'Z' " & filtroTurno & " ORDER BY a.dia, a.hora, a.id"
+                CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Turno) " & miTurno & vbCrLf & vbCrLf
+                If tipo = 2 Then
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por hora)" & Format(horaAnterior, "ddd, dd-MMM-yyyy HH") & vbCrLf & vbCrLf
                     archivoEnv = "reporteOEE_hora"
                 ElseIf tipo = 3 Then
-                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por día)" & vbCrLf & vbCrLf
-                    cadSQL = "SELECT a.*, b.nombre AS nequipo, i.nombre AS nparte, c.numero, IF(a.disponible = 3599, 3600, a.disponible) AS disponible2, IF(a.mantto = 3599, 3600, a.mantto) AS mantto2, IF(a.tiempo = 3599, 3600, a.tiempo ) AS tiempo2, IF(a.paro= 3599, 3600, a.paro) AS paro2, d.nombre AS nturno, e.nombre AS ntripulacion, f.nombre AS ncausa, g.nombre AS nresp1, h.nombre AS nresp2 FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(diaAnterior, "yyyy/MM/dd") & "' ORDER BY a.dia, a.hora, a.id"
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por día) " & Format(diaAnterior, "ddd, dd-MMM-yyyy") & vbCrLf & vbCrLf
                     archivoEnv = "reporteOEE_dia"
                 End If
 
@@ -955,30 +981,30 @@ Module basico
                     File.Delete(rutaFiles & "\" & archivoEnv & ".csv")
                     File.Delete(rutaFiles & "\" & archivoEnv & ".csv")
 
-
                 Catch ex As Exception
 
                 End Try
 
-                Dim totalParos = 0
-                Dim totalProduccion = 0
-                Dim totalCalidad = 0
-                Dim totalDisponibilidad = 0
+                Dim totalParos As Double = 0
+                Dim totalProduccion As Double = 0
+                Dim totalCalidad As Double = 0
+                Dim totalManual As Double = 0
+                Dim totalDisponibilidad As Double = 0
 
-                Dim ttotalParos = 0
-                Dim ttotalProduccion = 0
-                Dim ttotalCalidad = 0
-                Dim ttotalDisponibilidad = 0
+                Dim ttotalParos As Double = 0
+                Dim ttotalProduccion As Double = 0
+                Dim ttotalCalidad As Double = 0
+                Dim ttotalManual As Double = 0
+                Dim ttotalDisponibilidad As Double = 0
 
                 Dim requiereResumen = False
 
                 Dim thDesde
                 Dim thHasta
 
-                Dim tplan = 0
-                Dim treal = 0
-                Dim ttMalas = 0
-
+                Dim tplan As Double = 0
+                Dim treal As Double = 0
+                Dim ttMalas As Double = 0
 
                 Dim cabecera = False
 
@@ -986,16 +1012,15 @@ Module basico
 
                 Dim objWriter As New System.IO.StreamWriter(rutaFiles & "\" & archivoEnv & ".csv", False, System.Text.Encoding.UTF8)
                 If tipo = 1 Then
-                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)")
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por Turno) => " & miTurno)
                 ElseIf tipo = 2 Then
-                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por hora)")
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por hora) => " & Format(horaAnterior, "ddd, dd-MMM-yyyy HH"))
                 ElseIf tipo = 3 Then
-                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por día)")
+                    objWriter.WriteLine("SIGMA Reportes: Resumen del Hora por hora (Corte por día) => " & Format(diaAnterior, "ddd, dd-MMM-yyyy"))
                 End If
                 objWriter.WriteLine("Generado en: " & Format(Now(), "ddd dd-MMM-yyyy HH:mm:ss"))
                 objWriter.WriteLine(cadTitulos)
                 Dim oeeTA = 0
-                Dim miTurno = ""
                 Dim mensajesDS As DataSet = consultaSEL(cadSQL)
                 If mensajesDS.Tables(0).Rows.Count > 0 Then
 
@@ -1012,39 +1037,50 @@ Module basico
                                 CadenaMail = CadenaMail & "Fecha: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy") & vbCrLf
                             End If
                         End If
-                        Dim rendimiento = 100
-                        Dim calidad = 100
-                        Dim disponibilidad = 100
-                        Dim oee = 0
+                        Dim rendimiento As Double = 100
+                        Dim calidad As Double = 100
+                        Dim disponibilidad As Double = 100
+                        Dim oee As Double = 0
 
                         If elmensaje!tiempo2 - elmensaje!paro2 > 0 Then
-                            rendimiento = (elmensaje!buenas_tc + elmensaje!malas_tc) / (elmensaje!tiempo2 - elmensaje!paro2) * 100
+                            rendimiento = elmensaje!buenas_tc / (elmensaje!tiempo2 - elmensaje!paro2) * 100
                         End If
-                        If elmensaje!buenas_tc + elmensaje!malas_tc > 0 And elmensaje!malas_tc Then
-                            calidad = (1 - elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc)) * 100
+                        tplan = tplan + elmensaje!plan
+                        treal = treal + elmensaje!buenas
+
+                        If elmensaje!buenas_tc > 0 And elmensaje!malas_tc > 0 Then
+                            calidad = (1 - elmensaje!malas_tc / elmensaje!buenas_tc) * 100
                         End If
                         Dim tcReal As Double = elmensaje!tc
                         If elmensaje!tiempo2 > 0 Then
                             disponibilidad = (1 - elmensaje!paro2 / elmensaje!tiempo2) * 100
-                            tcReal = (elmensaje!buenas + elmensaje!malas) / elmensaje!tiempo2
+                        End If
+                        If elmensaje!buenas > 0 Then
+                            tcReal = elmensaje!tiempo2 / elmensaje!buenas
                         End If
                         totalParos = totalParos + elmensaje!paro2
-                        totalProduccion = totalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        totalProduccion = totalProduccion + elmensaje!buenas_tc
                         totalCalidad = totalCalidad + elmensaje!malas_tc
                         totalDisponibilidad = totalDisponibilidad + elmensaje!tiempo2
-                        Dim adherencia = 0
+                        Dim adherencia As Double = 0
                         If elmensaje!plan > 0 Then
-                            adherencia = (elmensaje!malas + elmensaje!buenas) / elmensaje!plan * 100
+                            adherencia = elmensaje!buenas / elmensaje!plan * 100
                         End If
                         oee = IIf(rendimiento > 100, 100, rendimiento) * calidad * disponibilidad / 10000
-                        Dim cadReporte = linea & "," & Chr(34) & IIf(elmensaje!ruptura = 0, "Hora", IIf(elmensaje!ruptura = 1, "Turno", IIf(elmensaje!ruptura = 2, "Día", IIf(elmensaje!ruptura = 3, "Número de parte", IIf(elmensaje!ruptura = 4, "Número de lote/Orden", "Tiempo Ciclo"))))) & Chr(34) & "," & Chr(34) & Format(elmensaje!dia, "dd-MMM-yyyy") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nequipo, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!numero, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nparte, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nturno, "A") & Chr(34) & "," & Chr(34) & elmensaje!hora & Chr(34) & "," & Chr(34) & elmensaje!desde & Chr(34) & "," & Chr(34) & elmensaje!hasta & Chr(34) & "," & Chr(34) & elmensaje!tiempo2 & Chr(34) & "," & Chr(34) & elmensaje!paro2 & Chr(34) & "," & Chr(34) & elmensaje!tc & Chr(34) & "," & Chr(34) & elmensaje!plan & Chr(34) & "," & Chr(34) & elmensaje!plan_van & Chr(34) & "," & Chr(34) & elmensaje!buenas & Chr(34) & "," & Chr(34) & elmensaje!malas & Chr(34) & "," & Chr(34) & (elmensaje!malas + elmensaje!buenas) & Chr(34) & "," & Chr(34) & (elmensaje!plan - elmensaje!buenas - elmensaje!malas) * -1 & Chr(34) & "," & Chr(34) & adherencia & Chr(34) & "," & Chr(34) & (elmensaje!buenas_vienen + elmensaje!malas_vienen) & Chr(34) & "," & Chr(34) & rendimiento & Chr(34) & "," & Chr(34) & calidad & Chr(34) & "," & Chr(34) & disponibilidad & Chr(34) & "," & Chr(34) & oee & Chr(34) & "," & Chr(34) & tcReal & Chr(34) & "," & Chr(34) & elmensaje!diferencia_vienen & Chr(34) & "," & Chr(34) & IIf(elmensaje!tipo = 0, "No", "Si") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ntripulacion, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!comentarios, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ncausa, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp1, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp2, "A") & Chr(34)
+                        Dim cadReporte = ""
+                        Try
+                            cadReporte = linea & "," & Chr(34) & IIf(elmensaje!ruptura = 0, "Hora", IIf(elmensaje!ruptura = 1, "Turno", IIf(elmensaje!ruptura = 2, "Día", IIf(elmensaje!ruptura = 3, "Número de parte", IIf(elmensaje!ruptura = 4, "Número de lote/Orden", "Tiempo Ciclo"))))) & Chr(34) & "," & Chr(34) & Format(elmensaje!dia, "dd-MMM-yyyy") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nequipo, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!numero, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nparte, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nturno, "A") & Chr(34) & "," & Chr(34) & elmensaje!hora & Chr(34) & "," & Chr(34) & elmensaje!desde & Chr(34) & "," & Chr(34) & elmensaje!hasta & Chr(34) & "," & Chr(34) & elmensaje!tiempo2 & Chr(34) & "," & Chr(34) & elmensaje!paro2 & Chr(34) & "," & Chr(34) & elmensaje!tc & Chr(34) & "," & Chr(34) & elmensaje!plan & Chr(34) & "," & Chr(34) & elmensaje!plan_van & Chr(34) & "," & Chr(34) & elmensaje!buenas - elmensaje!malas & Chr(34) & "," & Chr(34) & elmensaje!malas & Chr(34) & "," & Chr(34) & elmensaje!buenas & Chr(34) & "," & Chr(34) & (elmensaje!plan - elmensaje!buenas) * -1 & Chr(34) & "," & Chr(34) & adherencia & Chr(34) & "," & Chr(34) & (elmensaje!buenas_vienen) & Chr(34) & "," & Chr(34) & rendimiento & Chr(34) & "," & Chr(34) & calidad & Chr(34) & "," & Chr(34) & disponibilidad & Chr(34) & "," & Chr(34) & oee & Chr(34) & "," & Chr(34) & elmensaje!scrap & Chr(34) & "," & Chr(34) & tcReal & Chr(34) & "," & Chr(34) & elmensaje!diferencia_vienen & Chr(34) & "," & Chr(34) & IIf(elmensaje!tipo = 0, "No", "Si") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ntripulacion, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!comentarios, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!ncausa, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp1, "A") & Chr(34) & "," & Chr(34) & ValNull(elmensaje!nresp2, "A") & Chr(34)
+
+                        Catch ex As Exception
+                            'MsgBox(ex.Message)
+                        End Try
                         objWriter.WriteLine(cadReporte)
                     Next
 
 
-                    Dim tRendimiento = 100
-                    Dim tCalidad = 100
-                    Dim tDisponibilidad = 100
+                    Dim tRendimiento As Double = 100
+                    Dim tCalidad As Double = 100
+                    Dim tDisponibilidad As Double = 100
                     If totalDisponibilidad - totalParos > 0 Then
                         tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
                     End If
@@ -1087,19 +1123,21 @@ Module basico
                 objWriter.Close()
 
 
+                'Msgbox("genero primer archivo")
                 Dim archivo As Attachment = New Attachment(rutaFiles & "\" & archivoEnv & ".csv")
                 mail.Attachments.Add(archivo)
+
+                cadSQL = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, SUM(a.scrap) AS scrap, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus = 'Z' " & filtroTurno & " GROUP BY a.equipo, a.dia, a.hora"
 
                 ''''Construcción del mail
                 If tipo = 1 Then
                     CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Turno)" & vbCrLf & vbCrLf
-                    cadSQL = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.secuencia = " & secuencia & " GROUP BY a.equipo, a.dia, a.hora"
+
                 ElseIf tipo = 2 Then
-                    CadenaMail = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(horaAnterior, "yyyy/MM/dd") & "' AND hora = " & Val(Format(horaAnterior, "HH")) & " GROUP BY a.equipo, a.dia, a.hora"
+                    CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por Hora)" & vbCrLf & vbCrLf
                     archivoEnv = "reporteOEE_hora"
                 ElseIf tipo = 3 Then
                     CadenaMail = "SIGMA Reportes: Resumen del Hora por hora (Corte por día)" & vbCrLf & vbCrLf
-                    cadSQL = "SELECT a.equipo, b.nombre AS nequipo, a.dia, a.hora, MIN(a.desde) AS desde, MAX(a.hasta) AS hasta, SUM(a.plan) AS plan, MAX(a.plan_van) AS plan_van, GROUP_CONCAT(i.nombre SEPARATOR '~~') AS nparte, GROUP_CONCAT(c.numero SEPARATOR '~~') AS numero, SUM(IF(a.disponible = 3599, 3600, a.disponible)) AS disponible2, SUM(IF(a.mantto = 3599, 3600, a.mantto)) AS mantto2, SUM(IF(a.tiempo = 3599, 3600, a.tiempo)) AS tiempo2, SUM(IF(a.paro= 3599, 3600, a.paro)) AS paro2, d.nombre AS nturno, GROUP_CONCAT(f.nombre  SEPARATOR '~~') AS ncausa, GROUP_CONCAT(g.nombre SEPARATOR '~~') AS nresp1, GROUP_CONCAT(h.nombre SEPARATOR '~~') AS nresp2, GROUP_CONCAT(a.comentarios SEPARATOR '~~') AS comentarios, SUM(a.buenas) AS buenas, SUM(a.buenas_tc) AS buenas_tc, SUM(a.malas) AS malas, SUM(a.malas_tc) AS malas_tc FROM " & rutaBD & ".horaxhora a LEFT JOIN " & rutaBD & ".cat_maquinas b ON a.equipo = b.id LEFT JOIN " & rutaBD & ".lotes c ON a.lote = c.id LEFT JOIN " & rutaBD & ".cat_turnos d ON a.turno = d.id LEFT JOIN " & rutaBD & ".cat_tripulacion e ON a.tripulacion_inicial = e.id LEFT JOIN " & rutaBD & ".cat_generales f ON a.causa = f.id LEFT JOIN " & rutaBD & ".cat_generales g ON a.responsable = g.id LEFT JOIN " & rutaBD & ".cat_generales h ON a.responsable2 = h.id LEFT JOIN " & rutaBD & ".cat_partes i ON a.parte = i.id WHERE a.estatus IN ('A', 'Z') AND a.dia = '" & Format(diaAnterior, "yyyy/MM/dd") & "' GROUP BY a.equipo, a.dia, a.hora"
                     archivoEnv = "reporteOEE_dia"
                 End If
 
@@ -1120,10 +1158,18 @@ Module basico
                 totalParos = 0
                 totalProduccion = 0
                 totalCalidad = 0
+                totalManual = 0
                 totalDisponibilidad = 0
+                tplan = 0
+                treal = 0
+                ttMalas = 0
+                Dim ttPlan = 0
+                Dim ttReal = 0
 
                 mensajesDS = consultaSEL(cadSQL)
                 If mensajesDS.Tables(0).Rows.Count > 0 Then
+
+                    'MsgBox("hay datos")
 
                     cabecera = False
                     linea = 0
@@ -1132,7 +1178,8 @@ Module basico
                     Dim tMalas = 0
 
                     Dim hDesde
-                    Dim hHasta
+                    Dim hHasta = Convert.ToDateTime(Format(mensajesDS.Tables(0).Rows(0)!dia, "yyyy/MM/dd") & " " & mensajesDS.Tables(0).Rows(0)!desde)
+                    Dim printhHasta = ""
                     Dim equipoActual = mensajesDS.Tables(0).Rows(0)!equipo
 
 
@@ -1150,19 +1197,29 @@ Module basico
                             'Cabecera
                             '
                             If linea > 1 Then
-                                Dim tRendimiento = 100
-                                Dim tCalidad = 100
-                                Dim tScrap = 0
-                                Dim tParos = 0
+                                Dim tRendimiento As Double = 100
+                                Dim tEficiencia As Double = 0
+                                Dim tCalidad As Double = 100
+                                Dim tScrap As Double = 0
+                                Dim tScrapManual As Double = 0
+                                Dim tParos As Double = 0
                                 linea = 0
                                 Dim tDisponibilidad = 100
                                 If totalDisponibilidad - totalParos <> 0 Then
                                     tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
                                 End If
+                                If tplan <> 0 Then
+                                    tEficiencia = treal / tplan * 100
+                                End If
                                 If totalProduccion > 0 Then
                                     tCalidad = (1 - totalCalidad / totalProduccion) * 100
                                     tScrap = totalCalidad / totalProduccion * 100
                                 End If
+
+                                If (treal - tMalas + totalManual) > 0 Then
+                                    tScrapManual = totalManual / (treal - tMalas + totalManual) * 100
+                                End If
+
                                 If totalDisponibilidad > 0 Then
                                     tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
                                     tParos = totalParos / totalDisponibilidad * 100
@@ -1172,10 +1229,10 @@ Module basico
                                 myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
 
                                 myBuilder.Append("<td align='center' valign='top'>")
-                                myBuilder.Append(Left(hDesde, 5) & " " & Left(hHasta, 5))
+                                myBuilder.Append(hDesde & " " & hHasta)
                                 myBuilder.Append("</td>")
 
-                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
                                 myBuilder.Append(IIf(totalDisponibilidad > 0, calcularTiempoCad(totalDisponibilidad), "0"))
                                 myBuilder.Append("</td>")
 
@@ -1187,25 +1244,34 @@ Module basico
                                 myBuilder.Append(Math.Round(plan))
                                 myBuilder.Append("</td>")
                                 '
-                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                                 myBuilder.Append(Math.Round(real))
                                 myBuilder.Append("</td>")
 
-                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                                 myBuilder.Append(Math.Round(real))
                                 myBuilder.Append("</td>")
                                 '''
                                 myBuilder.Append("<td align='center' valign='top'>")
-                                myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                                myBuilder.Append(Math.Round(tEficiencia) & "%")
                                 myBuilder.Append("</td>")
 
-                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                                 myBuilder.Append(Math.Round(tMalas))
                                 myBuilder.Append("</td>")
 
-                                myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                                 myBuilder.Append(Math.Round(tScrap, 0) & "%")
                                 myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(totalManual))
+                                myBuilder.Append("</td>")
+
+                                myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                                myBuilder.Append(Math.Round(tScrapManual, 0) & "%")
+                                myBuilder.Append("</td>")
+
 
                                 myBuilder.Append("<td align='right' valign='top'>")
                                 myBuilder.Append(IIf(totalParos > 0, calcularTiempoCad(totalParos), "0"))
@@ -1215,7 +1281,7 @@ Module basico
                                 myBuilder.Append(Math.Round(tParos, 0) & "%")
                                 myBuilder.Append("</td>")
 
-                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                                myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;font-weight: 700'>")
                                 myBuilder.Append(Math.Round(oeeTA, 0))
                                 myBuilder.Append("</td>")
 
@@ -1229,73 +1295,88 @@ Module basico
                             totalProduccion = 0
                             totalCalidad = 0
                             totalDisponibilidad = 0
+                            totalManual = 0
                             linea = 0
+                            tplan = 0
+                            treal = 0
+                            tMalas = 0
                         End If
                         linea = linea + 1
                         If Not cabecera Then
+                            'MsgBox("cabecera")
                             cabecera = True
                             If hDesde < elmensaje!desde Then
                                 hDesde = elmensaje!desde
                             End If
                             myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border: solid 1px DarkGray;font-weight: 600'>")
                             '''
-                            myBuilder.Append("<td align='left' valign='top' colspan='6' style='border:solid 1px DarkGray'>")
-                                myBuilder.Append("LINEA: " & ValNull(elmensaje!nequipo, "A"))
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='left' valign='top' colspan='7'style='border:solid 1px DarkGray'>")
-                                myBuilder.Append("DÍA: " & Format(elmensaje!dia, "ddd, dd-MMM-yyyy"))
-                                myBuilder.Append("</td>")
-                                '''
-                                myBuilder.Append("</tr>")
+                            myBuilder.Append("<td align='left' valign='top' colspan='7' style='border:solid 1px DarkGray'>")
+                            myBuilder.Append("LINEA: " & ValNull(elmensaje!nequipo, "A"))
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='left' valign='top' colspan='7'style='border:solid 1px DarkGray'>")
+                            myBuilder.Append("DÍA: " & Format(Now(), "ddd, dd-MMM-yyyy"))
+                            myBuilder.Append("</td>")
+                            '''
+                            myBuilder.Append("</tr>")
 
-                                myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border: solid 1px DarkGray;font-weight: 600'>")
-                                '''
-                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
-                                myBuilder.Append("HORA")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
-                                myBuilder.Append("DISPONIBLE")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
-                                myBuilder.Append("(A) PIEZAS/OBJETIVO")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
-                                myBuilder.Append("(B) PIEZAS REALES")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
-                                myBuilder.Append("EFICIENCIA (B/A)")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='background-color:#D6DBDF'>")
-                                myBuilder.Append("(C) SCRAP")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
-                                myBuilder.Append("TIEMPO PARO (D)")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border: solid 1px DarkGray;'>")
-                                myBuilder.Append("OEE")
-                                myBuilder.Append("</td>")
-                                myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
-                                myBuilder.Append("COMENTARIOS")
-                                myBuilder.Append("</td>")
-                                '''
-                                myBuilder.Append("</tr>")
-                            End If
-                            Dim rendimiento = 100
+                            myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border: solid 1px DarkGray;font-weight: 600'>")
+                            '''
+                            myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("HORA")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='left' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("TURNO")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("DISPONIBLE")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("(A) PIEZAS/OBJETIVO")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("(B) PIEZAS REALES")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("ADHERENCIA (B/A)")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("(C) SCRAP MANUAL")
+                            myBuilder.Append("</td>")
+                            'myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                            'myBuilder.Append("SCRAP (MANUAL)")
+                            'myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' colspan='2' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("TIEMPO PARO (D)")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("OEE")
+                            myBuilder.Append("</td>")
+                            myBuilder.Append("<td align='center' valign='top' style='border: solid 1px DarkGray;'>")
+                            myBuilder.Append("COMENTARIOS")
+                            myBuilder.Append("</td>")
+                            '''
+                            myBuilder.Append("</tr>")
+                        End If
+                        Dim rendimiento As Double = 100
                         Dim hayRendimiento = False
-                        Dim calidad = 100
-                        Dim scrap = 0
-                        Dim paros = 0
-                        Dim disponibilidad = 100
+                        Dim calidad As Double = 100
+                        Dim scrap As Double = 0
+                        Dim scrapManual = 0
+                        Dim paros As Double = 0
+                        Dim disponibilidad As Double = 100
                         Dim haydisponibilidad = False
-                        Dim oee = 0
+                        Dim oee As Double = 0
 
                         If elmensaje!tiempo2 - elmensaje!paro2 > 0 Then
-                            rendimiento = (elmensaje!buenas_tc + elmensaje!malas_tc) / (elmensaje!tiempo2 - elmensaje!paro2) * 100
+                            rendimiento = elmensaje!buenas_tc / (elmensaje!tiempo2 - elmensaje!paro2) * 100
                             hayRendimiento = True
                         End If
-                        If elmensaje!buenas_tc + elmensaje!malas_tc > 0 And elmensaje!malas_tc > 0 Then
-                            calidad = (1 - elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc)) * 100
-                            scrap = elmensaje!malas_tc / (elmensaje!buenas_tc + elmensaje!malas_tc) * 100
+                        If elmensaje!buenas_tc > 0 And elmensaje!malas_tc > 0 Then
+                            calidad = (1 - elmensaje!malas_tc / elmensaje!buenas_tc) * 100
+                            scrap = elmensaje!malas_tc / elmensaje!buenas_tc * 100
+                        End If
+                        If (elmensaje!buenas - elmensaje!malas + elmensaje!scrap) > 0 And elmensaje!scrap > 0 Then
+                            scrapManual = elmensaje!scrap / (elmensaje!buenas - elmensaje!malas + elmensaje!scrap) * 100
                         End If
                         If elmensaje!tiempo2 > 0 Then
                             disponibilidad = (1 - elmensaje!paro2 / elmensaje!tiempo2) * 100
@@ -1303,18 +1384,20 @@ Module basico
                             paros = elmensaje!paro2 / elmensaje!tiempo2 * 100
                         End If
                         totalParos = totalParos + elmensaje!paro2
-                        totalProduccion = totalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        totalManual = totalManual + elmensaje!scrap
+                        totalProduccion = totalProduccion + elmensaje!buenas_tc
                         totalCalidad = totalCalidad + elmensaje!malas_tc
                         totalDisponibilidad = totalDisponibilidad + elmensaje!tiempo2
                         '''
                         ttotalParos = ttotalParos + elmensaje!paro2
-                        ttotalProduccion = ttotalProduccion + elmensaje!buenas_tc + elmensaje!malas_tc
+                        ttotalProduccion = ttotalProduccion + elmensaje!buenas_tc
                         ttotalCalidad = ttotalCalidad + elmensaje!malas_tc
                         ttotalDisponibilidad = ttotalDisponibilidad + elmensaje!tiempo2
+                        ttotalManual = ttotalManual + elmensaje!scrap
                         '''
-                        Dim adherencia = 0
+                        Dim adherencia As Double = 0
                         If elmensaje!plan > 0 Then
-                            adherencia = (elmensaje!malas + elmensaje!buenas) / elmensaje!plan * 100
+                            adherencia = elmensaje!buenas / elmensaje!plan * 100
                         End If
                         oee = IIf(rendimiento > 100, 100, rendimiento) * calidad * disponibilidad / 10000
 
@@ -1330,7 +1413,11 @@ Module basico
                         End If
 
                         myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
-                        myBuilder.Append(Left(elmensaje!desde, 5) & " " & Left(elmensaje!hasta, 5))
+                        myBuilder.Append(elmensaje!desde & " " & elmensaje!hasta)
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='left' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append(ValNull(elmensaje!nturno, "A"))
                         myBuilder.Append("</td>")
 
                         myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
@@ -1338,10 +1425,13 @@ Module basico
                         myBuilder.Append("</td>")
 
                         plan = plan + elmensaje!plan
-                        real = real + elmensaje!buenas + elmensaje!malas
+                        real = real + elmensaje!buenas
 
                         tplan = tplan + elmensaje!plan
-                        treal = treal + elmensaje!buenas + elmensaje!malas
+                        treal = treal + elmensaje!buenas
+
+                        ttPlan = ttPlan + elmensaje!plan
+                        ttReal = ttReal + elmensaje!buenas
 
                         myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
                         myBuilder.Append(Math.Round(elmensaje!plan, 0))
@@ -1352,7 +1442,7 @@ Module basico
                         myBuilder.Append("</td>")
                         '
                         myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
-                        myBuilder.Append(Math.Round(elmensaje!buenas + elmensaje!malas))
+                        myBuilder.Append(Math.Round(elmensaje!buenas))
                         myBuilder.Append("</td>")
 
                         myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
@@ -1360,7 +1450,7 @@ Module basico
                         myBuilder.Append("</td>")
                         '''
                         myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
-                        myBuilder.Append(IIf(hayRendimiento, Math.Round(rendimiento, 0) & "%", "-"))
+                        myBuilder.Append(Math.Round(adherencia, 0) & "%")
                         myBuilder.Append("</td>")
                         Dim colorMalas = "none"
                         If elmensaje!malas > 0 Then
@@ -1371,8 +1461,16 @@ Module basico
                         myBuilder.Append("</td>")
 
                         myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
-                        myBuilder.Append(Math.Round(scrap, 0) & "%")
+                        myBuilder.Append(Math.Round(scrap, 2) & "%")
                         myBuilder.Append("</td>")
+
+                        'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;background-color:" & IIf(elmensaje!scrap > 0, "#FADBD8", "none") & "'>")
+                        'myBuilder.Append(Math.Round(elmensaje!scrap))
+                        'myBuilder.Append("</td>")
+
+                        'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray;'>")
+                        'myBuilder.Append(Math.Round(scrapManual, 0) & "%")
+                        'myBuilder.Append("</td>")
 
                         'columna compartida
                         colorMalas = "none"
@@ -1388,36 +1486,66 @@ Module basico
                         myBuilder.Append(Math.Round(paros, 0) & "%")
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;'>")
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;font-weight: 700'>")
                         myBuilder.Append(IIf(hayRendimiento And haydisponibilidad, Math.Round(oee, 0), "-"))
                         myBuilder.Append("</td>")
 
+                        Dim cadComentarios As String = Strings.Replace(ValNull(elmensaje!comentarios, "A"), "~~", "<br>")
+                        Dim causa As String = Strings.Replace(ValNull(elmensaje!ncausa, "A"), "~~", "<br>")
+                        Dim resp1 As String = Strings.Replace(ValNull(elmensaje!nresp1, "A"), "~~", "<br>")
+                        Dim resp2 As String = Strings.Replace(ValNull(elmensaje!nresp2, "A"), "~~", "<br>")
+                        If Not IsNothing(causa) Then
+                            If causa.Length > 0 Then
+                                cadComentarios = cadComentarios & "<br>Causa principal: " & causa
+                            End If
+                        End If
+                        If Not IsNothing(resp1) Then
+                            If resp1.Length > 0 Then
+                                cadComentarios = cadComentarios & "<br>Responsable (1): " & resp1
+                            End If
+
+                        End If
+                        If Not IsNothing(resp2) Then
+                            If resp2.Length > 0 Then
+                                cadComentarios = cadComentarios & "<br>Responsable (2): " & resp2
+                            End If
+                        End If
                         myBuilder.Append("<td align='left' valign='top' style='border:solid 1px DarkGray;'>")
-                        myBuilder.Append(Strings.Replace(ValNull(elmensaje!comentarios, "A"), "~~", "<br>"))
+                        myBuilder.Append(cadComentarios)
                         myBuilder.Append("</td>")
 
                         myBuilder.Append("</tr>")
-                        If hHasta > elmensaje!hasta Then
-                            hHasta = elmensaje!hasta
+                        If hHasta < Convert.ToDateTime(Format(elmensaje!dia, "yyyy/MM/dd") & " " & elmensaje!hasta) Then
+                            hHasta = Convert.ToDateTime(Format(elmensaje!dia, "yyyy/MM/dd") & " " & elmensaje!hasta)
+                            printhHasta = elmensaje!hasta
                         End If
 
                         thHasta = elmensaje!hasta
                     Next
-
+                    'MsgBox("termino el barrido")
                     myBuilder.Append("</tr>")
 
                     If linea > 1 Then
-                        Dim tRendimiento = 100
-                        Dim tCalidad = 100
-                        Dim tScrap = 0
-                        Dim tParos = 0
-                        Dim tDisponibilidad = 100
+                        'MsgBox("mas de una linea")
+                        Dim tRendimiento As Double = 100
+                        Dim tEficiencia As Double = 100
+                        Dim tCalidad As Double = 100
+                        Dim tScrap As Double = 0
+                        Dim tScrapManual As Double = 0
+                        Dim tParos As Double = 0
+                        Dim tDisponibilidad As Double = 100
                         If totalDisponibilidad - totalParos <> 0 Then
                             tRendimiento = totalProduccion / (totalDisponibilidad - totalParos) * 100
+                        End If
+                        If tplan <> 0 Then
+                            tEficiencia = treal / tplan * 100
                         End If
                         If ttotalProduccion > 0 Then
                             tCalidad = (1 - totalCalidad / totalProduccion) * 100
                             tScrap = totalCalidad / totalProduccion * 100
+                        End If
+                        If treal - tMalas + totalManual > 0 Then
+                            tScrapManual = totalManual / (treal - tMalas + totalManual) * 100
                         End If
                         If totalDisponibilidad > 0 Then
                             tDisponibilidad = (1 - totalParos / totalDisponibilidad) * 100
@@ -1428,40 +1556,53 @@ Module basico
                         myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
 
                         myBuilder.Append("<td align='center' valign='top'>")
-                        myBuilder.Append(Left(hDesde, 5) & " " & Left(hHasta, 5))
+                        myBuilder.Append(hDesde & " " & printhHasta)
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
+                        myBuilder.Append("")
+                        myBuilder.Append("</td>")
+
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
                         myBuilder.Append(IIf(totalDisponibilidad > 0, calcularTiempoCad(totalDisponibilidad), "0"))
                         myBuilder.Append("</td>")
+
 
                         myBuilder.Append("<td align='right' valign='top'>")
                         myBuilder.Append(Math.Round(plan, 0))
                         myBuilder.Append("</td>")
 
                         myBuilder.Append("<td align='right' valign='top'>")
-                        myBuilder.Append(Math.Round(plan))
+                        myBuilder.Append("")
                         myBuilder.Append("</td>")
                         '
-                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                         myBuilder.Append(Math.Round(real))
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
-                        myBuilder.Append(Math.Round(real))
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                        myBuilder.Append("")
                         myBuilder.Append("</td>")
                         '''
                         myBuilder.Append("<td align='center' valign='top'>")
-                        myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                        myBuilder.Append(Math.Round(tEficiencia, 0) & "%")
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                         myBuilder.Append(Math.Round(tMalas))
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
-                        myBuilder.Append(Math.Round(tScrap, 0) & "%")
+                        myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                        myBuilder.Append(Math.Round(tScrap, 2) & "%")
                         myBuilder.Append("</td>")
+
+                        'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                        'myBuilder.Append(Math.Round(totalManual))
+                        'myBuilder.Append("</td>")
+
+                        'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                        'myBuilder.Append(Math.Round(tScrapManual, 0) & "%")
+                        'myBuilder.Append("</td>")
 
                         myBuilder.Append("<td align='right' valign='top'>")
                         myBuilder.Append(IIf(totalParos > 0, calcularTiempoCad(totalParos), "0"))
@@ -1471,7 +1612,7 @@ Module basico
                         myBuilder.Append(Math.Round(tParos, 0) & "%")
                         myBuilder.Append("</td>")
 
-                        myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                        myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray;font-weight: 700'>")
                         myBuilder.Append(Math.Round(oeeTA, 0))
                         myBuilder.Append("</td>")
 
@@ -1488,7 +1629,7 @@ Module basico
                         mail.Subject = "SIGMA Reporting Hora por hora (corte al turno) " & miTurno & ": Sin información"
 
                     ElseIf tipo = 2 Then
-                        mail.Subject = "SIGMA Reporting Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": Sin información"
+                        mail.Subject = "SIGMA Reporting Hora por hora (corte por hora) " & Format(horaAnterior, "yyyy/MM/dd") & " hora: " & Format(horaAnterior, "HH") & ": Sin información"
 
                     ElseIf tipo = 3 Then
                         mail.Subject = "SIGMA Reporting Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": Sin información"
@@ -1497,18 +1638,27 @@ Module basico
                     myBuilder.Append("No se encontró información para el reporte...")
 
                 End If
-                If requiereresumen Then
-                    Dim tRendimiento = 100
-                    Dim tCalidad = 100
-                    Dim tScrap = 0
-                    Dim tParos = 0
+                If requiereResumen Then
+                    'MsgBox("resumen")
+                    Dim tRendimiento As Double = 100
+                    Dim tEficiencia As Double = 100
+                    Dim tCalidad As Double = 100
+                    Dim tScrap As Double = 0
+                    Dim tScrapManual As Double = 0
+                    Dim tParos As Double = 0
                     Dim tDisponibilidad = 100
                     If ttotalDisponibilidad - ttotalParos <> 0 Then
                         tRendimiento = ttotalProduccion / (ttotalDisponibilidad - ttotalParos) * 100
                     End If
+                    If ttPlan <> 0 Then
+                        tEficiencia = ttReal / ttPlan * 100
+                    End If
                     If ttotalProduccion > 0 Then
                         tCalidad = (1 - ttotalCalidad / ttotalProduccion) * 100
                         tScrap = ttotalCalidad / ttotalProduccion * 100
+                    End If
+                    If ttReal - ttMalas + ttotalManual > 0 Then
+                        tScrapManual = ttotalManual / (ttReal - ttMalas + ttotalManual) * 100
                     End If
                     If ttotalDisponibilidad > 0 Then
                         tDisponibilidad = (1 - ttotalParos / ttotalDisponibilidad) * 100
@@ -1519,10 +1669,14 @@ Module basico
                     myBuilder.Append("<tr align='left' valign='top' style='background-color:#DCDCDC;border:solid 1px DarkGray;font-weight: 600'>")
 
                     myBuilder.Append("<td align='center' valign='top'>")
-                    myBuilder.Append(Left(thDesde, 5) & " " & Left(thHasta, 5))
+                    myBuilder.Append(thDesde & " " & thHasta)
                     myBuilder.Append("</td>")
 
-                    myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
+                    myBuilder.Append("")
+                    myBuilder.Append("</td>")
+
+                    myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
                     myBuilder.Append(IIf(ttotalDisponibilidad > 0, calcularTiempoCad(ttotalDisponibilidad), "0"))
                     myBuilder.Append("</td>")
 
@@ -1534,25 +1688,33 @@ Module basico
                     myBuilder.Append(Math.Round(tplan))
                     myBuilder.Append("</td>")
                     '
-                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                     myBuilder.Append(Math.Round(treal))
                     myBuilder.Append("</td>")
 
-                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                     myBuilder.Append(Math.Round(treal))
                     myBuilder.Append("</td>")
                     '''
                     myBuilder.Append("<td align='center' valign='top'>")
-                    myBuilder.Append(Math.Round(tRendimiento, 0) & "%")
+                    myBuilder.Append(Math.Round(tEficiencia, 0) & "%")
                     myBuilder.Append("</td>")
 
-                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
                     myBuilder.Append(Math.Round(ttMalas))
                     myBuilder.Append("</td>")
 
-                    myBuilder.Append("<td align='right' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
-                    myBuilder.Append(Math.Round(tScrap, 0) & "%")
+                    myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                    myBuilder.Append(Math.Round(tScrap, 2) & "%")
                     myBuilder.Append("</td>")
+
+                    'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                    'myBuilder.Append(Math.Round(ttotalManual))
+                    'myBuilder.Append("</td>")
+
+                    'myBuilder.Append("<td align='right' valign='top' style='border:solid 1px DarkGray'>")
+                    'myBuilder.Append(Math.Round(tScrapManual, 0) & "%")
+                    'myBuilder.Append("</td>")
 
                     myBuilder.Append("<td align='right' valign='top'>")
                     myBuilder.Append(IIf(ttotalParos > 0, calcularTiempoCad(ttotalParos), "0"))
@@ -1562,7 +1724,7 @@ Module basico
                     myBuilder.Append(Math.Round(tParos, 0) & "%")
                     myBuilder.Append("</td>")
 
-                    myBuilder.Append("<td align='center' valign='top' style='background-color:#D6DBDF;border:solid 1px DarkGray'>")
+                    myBuilder.Append("<td align='center' valign='top' style='border:solid 1px DarkGray'>")
                     myBuilder.Append(Math.Round(oeeTA, 0))
                     myBuilder.Append("</td>")
 
@@ -1574,14 +1736,13 @@ Module basico
                 End If
                 myBuilder.Append("</table>")
                 If tipo = 1 Then
-                    mail.Subject = "SIGMA Reportes Hora por hora (corte al turno) " & miTurno & ": " & oeeTA.ToString("0.###") & "%"
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte al turno) " & miTurno & " => " & oeeTA.ToString("0.###") & "%"
 
                 ElseIf tipo = 2 Then
-                    mail.Subject = "SIGMA Reportes Hora por hora (corte por hora) " & Format(diaAnterior, "yyyy/MM/dd") & " hora: " & Format(diaAnterior, "HH") & ": " & oeeTA.ToString("0.###") & "%"
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte por hora) " & Format(horaAnterior, "yyyy/MM/dd") & " hora: " & Format(horaAnterior, "HH") & " => " & oeeTA.ToString("0.###") & "%"
 
                 ElseIf tipo = 3 Then
-                    mail.Subject = "SIGMA Reportes Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & ": " & oeeTA.ToString("0.###") & "%"
-
+                    mail.Subject = "SIGMA Reportes Hora por hora (corte por día) " & Format(diaAnterior, "yyyy/MM/dd") & " => " & oeeTA.ToString("0.###") & "%"
                 End If
                 agregarLOG("Se envió el correo resumen de OEE", 9, 0)
                 myBuilder.Append("<br>")
@@ -1592,9 +1753,12 @@ Module basico
                 mail.IsBodyHtml = True
                 mail.Body = myBuilder.ToString()
                 smtpServer.Send(mail)
+                agregarLOG("Mail enviado tipo: " & tipo, 9, 0)
+
 
             Catch ex As Exception
-                agregarLOG(ex.Message, 9, 0)
+                agregarLOG("Error al enviar el correo tipo: " & tipo & " => " & ex.Message, 9, 0)
+                'MsgBox("error: " & ex.Message)
             Finally
                 mail.Dispose()
             End Try

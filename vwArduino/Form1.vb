@@ -27,6 +27,8 @@ Public Class Form1
     Dim be_idioma As Integer
     Dim rutaAudios
     Dim rutaSMS
+    Dim puertoCOMM As String = ""
+    Dim puertoCOMMPar As String = ""
 
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -39,17 +41,21 @@ Public Class Form1
             MsgBox("String connection missing", MsgBoxStyle.Critical, "SIGMA")
         Else
             cadenaConexion = argumentos(1)
+            If argumentos.Length = 4 Then
+                puertoCOMM = argumentos(2)
+                puertoCOMMPar = argumentos(3)
+            End If
             contador = contador + 1
-            'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
-            Dim idProceso = Process.GetCurrentProcess.Id
+                'cadenaConexion = "server=127.0.0.1;user id=root;password=usbw;port=3307;Convert Zero Datetime=True"
+                Dim idProceso = Process.GetCurrentProcess.Id
 
-            idProceso = Process.GetCurrentProcess.Id
+                idProceso = Process.GetCurrentProcess.Id
 
-            estadoPrograma = True
+                estadoPrograma = True
 
-            generarLlamadas()
-        End If
-        Application.Exit()
+                generarLlamadas()
+            End If
+            Application.Exit()
     End Sub
 
     Private Sub generarLlamadas()
@@ -133,14 +139,14 @@ Public Class Form1
             contador = contador + 1
             TextBox1.Text = contador & ") " & traduccion(8) & rutaSMS & vbCrLf & TextBox1.Text
             eliminarArchivosAntiguos()
-            If ptoCOMM1.Length = 0 And ptoCOMM2.Length = 0 And ptoCOMM3.Length = 0 And ptoCOMM4.Length = 0 And ptoCOMM5.Length = 0 And ptoCOMM6.Length = 0 Then
+            If puertoCOMM.Length = 0 And ptoCOMM1.Length = 0 And ptoCOMM2.Length = 0 And ptoCOMM3.Length = 0 And ptoCOMM4.Length = 0 And ptoCOMM5.Length = 0 And ptoCOMM6.Length = 0 Then
                 If Not errorPuerto Then
                     agregarLOG(traduccion(7), 0, 9)
                     errorPuerto = True
                     Exit Sub
                 End If
             End If
-            If ptoCOMM1P.Length = 0 And ptoCOMM2P.Length = 0 And ptoCOMM3P.Length = 0 And ptoCOMM4P.Length = 0 And ptoCOMM5P.Length = 0 And ptoCOMM6P.Length = 0 Then
+            If puertoCOMMPar.Length = 0 And ptoCOMM1P.Length = 0 And ptoCOMM2P.Length = 0 And ptoCOMM3P.Length = 0 And ptoCOMM4P.Length = 0 And ptoCOMM5P.Length = 0 And ptoCOMM6P.Length = 0 Then
                 If Not errorPuerto Then
                     errorPuerto = True
                     agregarLOG(traduccion(7), 0, 9)
@@ -155,6 +161,11 @@ Public Class Form1
             ptoCOMM3 = ptoCOMM4.ToUpper
             ptoCOMM5 = ptoCOMM5.ToUpper
             ptoCOMM6 = ptoCOMM6.ToUpper
+            puertoCOMM = puertoCOMM.ToUpper
+            If puertoCOMM.Length > 0 Then
+                ptoCOMM1 = puertoCOMM
+                ptoCOMM1P = puertoCOMMPar
+            End If
             'Llamadas telefónicas
 
             If Not My.Computer.FileSystem.DirectoryExists(rutaAudios) Then
@@ -389,7 +400,7 @@ Public Class Form1
                                     Dim nombreArchivo = Path.GetFileName(FoundFile)
                                     If IsNumeric(Numero) Then
                                         Try
-                                            contador = contador + 1
+                                            contador = contador + 1 
                                             TextBox1.Text = contador & ") VB 'VOID'" & vbCrLf & TextBox1.Text
 
                                             SerialPort1.Write("VOID" & vbNewLine)

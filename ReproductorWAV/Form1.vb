@@ -34,11 +34,10 @@ Public Class Form1
         LinkLabel1.Top = 85
 
 
-
         Dim argumentos As String() = Environment.GetCommandLineArgs()
         If Process.GetProcessesByName _
           (Process.GetCurrentProcess.ProcessName).Length > 1 Then
-            XtraMessageBox.Show(traduccion(12), traduccion(13), MessageBoxButtons.OK, MessageBoxIcon.Error)
+            XtraMessageBox.Show("El Reproductor '" & Process.GetCurrentProcess.ProcessName & "' ya se está ejecutando en este equipo", "Sesión iniciada", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Application.Exit()
         Else
             idProceso = Process.GetCurrentProcess.Id
@@ -128,7 +127,6 @@ Public Class Form1
                     file.Close()
                 End If
             End If
-
             NotifyIcon1.Text = traduccion(8)
             TextEdit16.Text = Ruta
             TextEdit3.Text = Segundos

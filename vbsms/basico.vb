@@ -149,7 +149,7 @@ Module basico
                                     If arreCanales(i).Length > 0 Then
                                         'Redimensionamos el Array temporal y preservamos el valor  
                                         ReDim Preserve telefonos(totalItems + i)
-                                        telefonos(totalItems + i) = arreCanales(i)
+                                        telefonos(totalItems + i) = Strings.Trim(arreCanales(i))
                                     End If
 
 
@@ -453,7 +453,7 @@ Module basico
                                     If arreCanales(i).Length > 0 Then
                                         'Redimensionamos el Array temporal y preservamos el valor  
                                         ReDim Preserve telefonos(totalItems + i)
-                                        telefonos(totalItems + i) = arreCanales(i)
+                                        telefonos(totalItems + i) = Strings.Trim(arreCanales(i))
                                     End If
                                 Next
                                 tempArray = telefonos

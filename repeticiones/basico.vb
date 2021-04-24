@@ -17,6 +17,7 @@ Module basico
     Public serialMmcall As String
     Public rutaBD As String = "sigma"
     Public rutaMMCALL As String = "mmcall"
+    Public cadenaConexionMMCall_2 As String
     Public traduccion As String()
     Public be_idioma
 
@@ -80,6 +81,7 @@ Module basico
                         'Se actualiza el reporte
 
                         Dim cadMMCALL = ""
+                        Dim cadMMCALL_2 = ""
                         Dim eMensaje = evento!nmaquina & " " & evento!nfalla
                         For i = 0 To antes.Length - 1
                             eMensaje = Replace(eMensaje, antes(i), ahora(i))
@@ -118,39 +120,47 @@ Module basico
                                     ReDim Preserve mmcalls(totalItems + i)
                                     mmcalls(totalItems + i) = arreCanales(i)
                                 Next
-                                tempArray = mmcalls
-                                totalItems = mmcalls.Length
+                                'tempArray = mmcalls
+                                'totalItems = mmcalls.Length
 
-                                Dim x As Integer, y As Integer
-                                Dim z As Integer
+                                'Dim x As Integer, y As Integer
+                                'Dim z As Integer
 
-                                For x = 0 To UBound(mmcalls)
-                                    z = 0
-                                    For y = 0 To UBound(mmcalls) - 1
-                                        'Si el elemento del array es igual al array temporal  
-                                        If mmcalls(x) = tempArray(z) And y <> x Then
-                                            'Entonces Eliminamos el valor duplicado  
-                                            mmcalls(y) = ""
-                                        End If
-                                        z = z + 1
-                                    Next y
-                                Next x
+                                'For x = 0 To UBound(mmcalls)
+                                '    z = 0
+                                '    For y = 0 To UBound(mmcalls) - 1
+                                '        'Si el elemento del array es igual al array temporal  
+                                '        If mmcalls(x) = tempArray(z) And y <> x Then
+                                '            'Entonces Eliminamos el valor duplicado  
+                                '            mmcalls(y) = ""
+                                '        End If
+                                '        z = z + 1
+                                '    Next y
+                                'Next x
                                 canales = ""
                             End If
                             eMensaje = Microsoft.VisualBasic.Strings.Left(eMensaje, 40).Trim
                             Dim respuestaWS = ""
 
+                            Dim servidor1 = True
                             For i = 0 To UBound(mmcalls)
                                 If mmcalls(i).Length > 0 Then
+                                    If mmcalls(i) = "?" Then
+                                        servidor1 = False
+                                        cadMMCALL_2 = ""
+                                        Continue For
+                                    End If
+
                                     'Se valida el reloj
 
                                     Dim posReloj = Strings.InStr(mmcalls(i), "number=")
                                     Dim posiciones = 7
                                     Dim esNumero = True
+
                                     If posReloj = 0 Then
                                         posReloj = Strings.InStr(mmcalls(i), "division=")
                                         posiciones = 9
-                                        esNumero = False
+                                        esNumero = posReloj = 0
                                     End If
                                     Dim iReloj = ""
 
@@ -184,20 +194,34 @@ Module basico
                                         If Not valReloj(iReloj) And validar_reloj Then
                                             agregarLOG("Servicio de MMCall: " & mmcalls(i) & "&message=" & eMensaje & " error: ID sin licencia", nroReporte, 9)
                                             Continue For
-                                        Else
-                                            If cadMMCALL = "" Then
-                                                cadMMCALL = "INSERT INTO mmcall.tasks (location_id, task, message, recipients, status, created) VALUES "
+                                        ElseIf IsNumeric(iReloj) Then
+                                            If servidor1 Then
+                                                If cadMMCALL = "" Then
+                                                    cadMMCALL = "INSERT INTO mmcall.tasks (location_id, task, message, recipients, status, created) VALUES "
+                                                Else
+                                                    cadMMCALL = cadMMCALL & ","
+                                                End If
+                                                cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
                                             Else
-                                                cadMMCALL = cadMMCALL + ","
+                                                If cadMMCALL_2 = "" Then
+                                                    cadMMCALL_2 = "INSERT INTO mmcall.tasks (location_id, task, message, recipients, status, created) VALUES "
+                                                Else
+                                                    cadMMCALL_2 = cadMMCALL_2 & ","
+                                                End If
+                                                cadMMCALL_2 = cadMMCALL_2 & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
                                             End If
-                                            cadMMCALL = cadMMCALL & "(1, 'page', '" & eMensaje & "', '" & iReloj & "', 0, NOW())"
 
                                         End If
                                     End If
-
                                 End If
                             Next
                         End If
+                        If cadMMCALL_2.Length > 0 Then
+                            regsAfectados = consultaACT(cadMMCALL_2, cadenaConexionMMCall_2)
+                        ElseIf cadMMCALL.Length > 0 Then
+                            cadMMCALL = cadMMCALL & ";"
+                        End If
+
                         If cadMMCALL.Length > 0 Then cadMMCALL = cadMMCALL & ";"
                         regsAfectados = consultaACT(cadMMCALL & "UPDATE " & rutaBD & ".reportes SET mmcall = NOW() WHERE id = " & evento!id)
                         agregarLOG(traduccion(7) & evento!id)
@@ -216,10 +240,14 @@ Module basico
         'tipo 9: Error
         Dim regsAfectados = consultaACT("INSERT INTO " & rutaBD & ".log (aplicacion, tipo, proceso, texto) VALUES (" & aplicacion & ", " & tipo & ", " & reporte & ", '" & Microsoft.VisualBasic.Strings.Left(cadena, 250) & "')")
     End Sub
-    Public Function consultaACT(cadena As String) As Integer
+    Public Function consultaACT(cadena As String, Optional miCadenaConexion As String = "") As Integer
         Dim miConexion = New MySqlConnection
 
-        miConexion.ConnectionString = cadenaConexion
+        errorBD = ""
+        If miCadenaConexion = "" Then
+            miCadenaConexion = cadenaConexion
+        End If
+        miConexion.ConnectionString = miCadenaConexion
 
         miConexion.Open()
         consultaACT = 0

@@ -33,6 +33,8 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "listados", "vblistados\list
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "checklists", "checklists\checklists.vbproj", "{25C1E6B7-42A4-468F-BEED-CDA389B1CAEC}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "voz2", "voz_2\voz2.vbproj", "{138B8166-6D32-45B2-83E9-AD13B8F60CCB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -337,6 +339,26 @@ Global
 		{25C1E6B7-42A4-468F-BEED-CDA389B1CAEC}.Release|x64.Build.0 = Release|Any CPU
 		{25C1E6B7-42A4-468F-BEED-CDA389B1CAEC}.Release|x86.ActiveCfg = Release|Any CPU
 		{25C1E6B7-42A4-468F-BEED-CDA389B1CAEC}.Release|x86.Build.0 = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|ARM.Build.0 = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|x64.Build.0 = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Debug|x86.Build.0 = Debug|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|ARM.ActiveCfg = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|ARM.Build.0 = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|ARM64.Build.0 = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|x64.ActiveCfg = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|x64.Build.0 = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|x86.ActiveCfg = Release|Any CPU
+		{138B8166-6D32-45B2-83E9-AD13B8F60CCB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

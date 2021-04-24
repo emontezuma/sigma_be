@@ -14,6 +14,9 @@ Module basico
     Public cadenaConexion As String
     Public cadenaConexionMMCALL As String
     Public cadenaConexionFALLAS As String
+    Public cadenaConexionMMCALL_2 As String
+    Public serverMMCALL As String = ""
+    Public serverMMCALL_2 As String = ""
     Public rutaBD As String = "sigma"
     Public rutaMMCALL As String = "mmcall"
     Public miTurno As Long
@@ -37,10 +40,14 @@ Module basico
     End Function
 
 
-    Public Function consultaACT(cadena As String) As Integer
+    Public Function consultaACT(cadena As String, Optional miCadenaConexion As String = "") As Integer
         Dim miConexion = New MySqlConnection
 
-        miConexion.ConnectionString = cadenaConexion
+        errorBD = ""
+        If miCadenaConexion = "" Then
+            miCadenaConexion = cadenaConexion
+        End If
+        miConexion.ConnectionString = miCadenaConexion
 
         miConexion.Open()
         consultaACT = 0
